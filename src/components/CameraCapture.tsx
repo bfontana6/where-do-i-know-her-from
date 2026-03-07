@@ -30,15 +30,30 @@ interface ActorResult {
     }>;
 }
 
+interface CastMember {
+    id: number;
+    name: string;
+    character: string;
+    profilePath: string | null;
+}
+
 export default function CameraCapture({ watchHistory }: { watchHistory: string[] }) {
     const [image, setImage] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-    const [loadingState, setLoadingState] = useState<'idle' | 'recognizing' | 'cross-referencing'>('idle');
+    const [loadingState, setLoadingState] = useState<'idle' | 'recognizing' | 'cross-referencing' | 'cast-lookup'>('idle');
     const [result, setResult] = useState<ActorResult | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
     const [showCorrectionInput, setShowCorrectionInput] = useState(false);
     const [correctionName, setCorrectionName] = useState('');
+
+    // "Not found" helper flow
+    const [actorNotFound, setActorNotFound] = useState(false);
+    const [helperMode, setHelperMode] = useState<'actor' | 'show' | null>(null);
+    const [helperActorName, setHelperActorName] = useState('');
+    const [helperShowName, setHelperShowName] = useState('');
+    const [castResults, setCastResults] = useState<CastMember[] | null>(null);
+    const [castMediaTitle, setCastMediaTitle] = useState('');
 
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const libraryInputRef = useRef<HTMLInputElement>(null);
@@ -51,6 +66,12 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
         setFeedback(null);
         setShowCorrectionInput(false);
         setCorrectionName('');
+        setActorNotFound(false);
+        setHelperMode(null);
+        setHelperActorName('');
+        setHelperShowName('');
+        setCastResults(null);
+        setCastMediaTitle('');
         if (cameraInputRef.current) cameraInputRef.current.value = '';
         if (libraryInputRef.current) libraryInputRef.current.value = '';
     };
@@ -84,6 +105,13 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
             });
 
             const recognitionData = await recognitionRes.json();
+
+            if (recognitionRes.status === 404) {
+                // Could not identify — show the helper flow instead of a generic error
+                setActorNotFound(true);
+                setLoadingState('idle');
+                return;
+            }
 
             if (!recognitionRes.ok) {
                 throw new Error(recognitionData.error || 'Failed to recognize actor');
@@ -122,12 +150,37 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
         }
     };
 
-    // Used when the user corrects a misidentified actor by name.
-    // TODO: Also allow the user to enter the show/episode title they're watching
-    // and surface a list of likely cast candidates to choose from.
+    const lookupShowCast = async (showName: string) => {
+        setCastResults(null);
+        setCastMediaTitle('');
+        try {
+            setLoadingState('cast-lookup');
+            const res = await fetch('/api/cast-lookup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ showName }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to look up cast');
+            setCastMediaTitle(data.mediaTitle || showName);
+            setCastResults(data.cast || []);
+        } catch (err: any) {
+            setError(err.message || 'Failed to look up cast');
+            setActorNotFound(false);
+        } finally {
+            setLoadingState('idle');
+        }
+    };
+
     const lookupActor = async (actorName: string) => {
         setShowCorrectionInput(false);
         setCorrectionName('');
+        setActorNotFound(false);
+        setHelperMode(null);
+        setHelperActorName('');
+        setHelperShowName('');
+        setCastResults(null);
+        setCastMediaTitle('');
         setResult(null);
         setError(null);
         setFeedback(null);
@@ -238,7 +291,7 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                     <p className="text-white font-medium">
-                        {loadingState === 'recognizing' ? 'Identifying actor...' : 'Checking your watch history...'}
+                        {loadingState === 'recognizing' ? 'Identifying actor...' : loadingState === 'cast-lookup' ? 'Looking up cast...' : 'Checking your watch history...'}
                     </p>
                 </div>
             )}
@@ -262,6 +315,119 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
                             New Scan
                         </button>
                     </div>
+                </div>
+            )}
+
+            {/* Actor not found — helper flow */}
+            {actorNotFound && loadingState === 'idle' && (
+                <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="p-5 border-b border-zinc-800/60">
+                        <p className="text-white font-semibold text-base">Couldn&apos;t identify anyone</p>
+                        <p className="text-zinc-500 text-sm mt-0.5">Help us out — tell us who it is or what you&apos;re watching.</p>
+                    </div>
+
+                    {!helperMode && (
+                        <div className="p-4 flex flex-col gap-3">
+                            <button
+                                onClick={() => setHelperMode('actor')}
+                                className="w-full flex items-center gap-3 px-4 py-3.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition text-left"
+                            >
+                                <div className="w-9 h-9 rounded-lg bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
+                                    <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+                                </div>
+                                <div>
+                                    <p className="text-white text-sm font-medium">I know their name</p>
+                                    <p className="text-zinc-500 text-xs">Enter the actor&apos;s name directly</p>
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => setHelperMode('show')}
+                                className="w-full flex items-center gap-3 px-4 py-3.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition text-left"
+                            >
+                                <div className="w-9 h-9 rounded-lg bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+                                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 20.25h12m-7.5-3v3m3-3v3m-10.125-3h17.25c.621 0 1.125-.504 1.125-1.125V4.875c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125z" /></svg>
+                                </div>
+                                <div>
+                                    <p className="text-white text-sm font-medium">I know the show</p>
+                                    <p className="text-zinc-500 text-xs">Browse the cast and pick who it is</p>
+                                </div>
+                            </button>
+                            <button onClick={resetAll} className="text-xs text-zinc-600 hover:text-zinc-400 transition text-center mt-1">
+                                Start over
+                            </button>
+                        </div>
+                    )}
+
+                    {helperMode === 'actor' && (
+                        <form
+                            onSubmit={(e) => { e.preventDefault(); if (helperActorName.trim()) lookupActor(helperActorName.trim()); }}
+                            className="p-4 flex flex-col gap-3 animate-in fade-in duration-200"
+                        >
+                            <label className="text-xs text-zinc-400 px-1">Actor or actress name:</label>
+                            <input
+                                autoFocus
+                                type="text"
+                                value={helperActorName}
+                                onChange={(e) => setHelperActorName(e.target.value)}
+                                placeholder="e.g. Bryan Cranston"
+                                className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-zinc-600"
+                            />
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setHelperMode(null)} className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium rounded-xl transition">Back</button>
+                                <button type="submit" disabled={!helperActorName.trim()} className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition disabled:opacity-50">Look Up</button>
+                            </div>
+                        </form>
+                    )}
+
+                    {helperMode === 'show' && !castResults && (
+                        <form
+                            onSubmit={(e) => { e.preventDefault(); if (helperShowName.trim()) lookupShowCast(helperShowName.trim()); }}
+                            className="p-4 flex flex-col gap-3 animate-in fade-in duration-200"
+                        >
+                            <label className="text-xs text-zinc-400 px-1">Movie or show title:</label>
+                            <input
+                                autoFocus
+                                type="text"
+                                value={helperShowName}
+                                onChange={(e) => setHelperShowName(e.target.value)}
+                                placeholder="e.g. Breaking Bad"
+                                className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-zinc-600"
+                            />
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setHelperMode(null)} className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium rounded-xl transition">Back</button>
+                                <button type="submit" disabled={!helperShowName.trim()} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-xl transition disabled:opacity-50">Find Cast</button>
+                            </div>
+                        </form>
+                    )}
+
+                    {helperMode === 'show' && castResults && (
+                        <div className="p-4 animate-in fade-in duration-200">
+                            <div className="flex items-center justify-between mb-3">
+                                <p className="text-sm text-zinc-300 font-medium">Cast of <span className="text-white">{castMediaTitle}</span></p>
+                                <button onClick={() => { setCastResults(null); setHelperShowName(''); }} className="text-xs text-zinc-600 hover:text-zinc-400 transition">Change show</button>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 max-h-[50vh] overflow-y-auto">
+                                {castResults.map((member) => (
+                                    <button
+                                        key={member.id}
+                                        onClick={() => lookupActor(member.name)}
+                                        className="flex flex-col items-center gap-1.5 p-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition active:scale-95 text-center"
+                                    >
+                                        {member.profilePath ? (
+                                            /* eslint-disable-next-line @next/next/no-img-element */
+                                            <img src={member.profilePath} alt={member.name} className="w-16 h-16 rounded-full object-cover border border-zinc-700" />
+                                        ) : (
+                                            <div className="w-16 h-16 rounded-full bg-zinc-700 border border-zinc-600 flex items-center justify-center">
+                                                <svg className="w-7 h-7 text-zinc-500" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+                                            </div>
+                                        )}
+                                        <p className="text-white text-[11px] font-medium leading-tight">{member.name}</p>
+                                        {member.character && <p className="text-zinc-500 text-[10px] leading-tight truncate w-full">{member.character}</p>}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

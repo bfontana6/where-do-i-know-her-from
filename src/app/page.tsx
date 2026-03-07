@@ -31,9 +31,8 @@ export default function Home() {
         {/* Compact Header */}
         <header className="py-5 flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-600 mb-1">Who&apos;s That?</p>
             <h1 className="text-xl font-bold text-white tracking-tight leading-tight">
-              Where Do I Know Her From?
+              Where Do I Know Them From?
             </h1>
           </div>
           {watchHistory && watchHistory.length > 0 && (

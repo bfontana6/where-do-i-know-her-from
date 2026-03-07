@@ -22,9 +22,35 @@ interface HamburgerMenuProps {
 export default function HamburgerMenu({ watchHistory, onHistoryUpdate }: HamburgerMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [showSingleTitleInput, setShowSingleTitleInput] = useState(false);
+    const [showHistoryView, setShowHistoryView] = useState(false);
+    const [historySearch, setHistorySearch] = useState('');
     const [singleTitle, setSingleTitle] = useState('');
     const [loading, setLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // For the viewer, show only "clean" titles — not raw Netflix episode strings
+    // (those are still stored for matching purposes but would clutter the list)
+    const displayHistory = (watchHistory || [])
+        .filter(t => !t.match(/:\s*Season\s+\d/i))
+        .sort((a, b) => a.localeCompare(b));
+
+    const filteredHistory = historySearch.trim()
+        ? displayHistory.filter(t => t.toLowerCase().includes(historySearch.toLowerCase()))
+        : displayHistory;
+
+    const removeTitle = (titleToRemove: string) => {
+        // Remove both the clean title and any episode entries that start with it
+        const updated = (watchHistory || []).filter(t =>
+            t !== titleToRemove && !t.toLowerCase().startsWith(titleToRemove.toLowerCase() + ':')
+        );
+        if (updated.length === 0) {
+            localStorage.removeItem('watchHistory');
+            onHistoryUpdate(null);
+        } else {
+            localStorage.setItem('watchHistory', JSON.stringify(updated));
+            onHistoryUpdate(updated);
+        }
+    };
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -138,11 +164,21 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate }: Hamburg
                                     <>
                                         <div className="h-px bg-zinc-800 my-1 mx-2"></div>
                                         <button
+                                            onClick={() => { setIsOpen(false); setShowHistoryView(true); }}
+                                            className="w-full text-left px-4 py-3 text-sm font-medium text-zinc-300 hover:bg-zinc-800 rounded-lg transition flex items-center justify-between gap-2"
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                                                View History
+                                            </span>
+                                            <span className="text-xs text-zinc-600 bg-zinc-800 px-2 py-0.5 rounded-full">{displayHistory.length}</span>
+                                        </button>
+                                        <button
                                             onClick={handleClearHistory}
                                             className="w-full text-left px-4 py-3 text-sm font-medium text-red-400 hover:bg-zinc-800 rounded-lg transition flex items-center gap-2"
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                            Clear History
+                                            Clear All History
                                         </button>
                                     </>
                                 )}
@@ -182,10 +218,81 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate }: Hamburg
             
             {/* Click away overlay */}
             {isOpen && (
-                <div 
-                    className="fixed inset-0 z-[-1]" 
+                <div
+                    className="fixed inset-0 z-[-1]"
                     onClick={() => { setIsOpen(false); setShowSingleTitleInput(false); }}
                 ></div>
+            )}
+
+            {/* History bottom sheet */}
+            {showHistoryView && (
+                <div
+                    className="fixed inset-0 z-[200] bg-black/70 flex flex-col justify-end"
+                    onClick={() => { setShowHistoryView(false); setHistorySearch(''); }}
+                >
+                    <div
+                        className="bg-zinc-950 border-t border-zinc-800 rounded-t-3xl flex flex-col animate-in slide-in-from-bottom-4 duration-300"
+                        style={{ maxHeight: '85vh' }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Handle */}
+                        <div className="flex justify-center pt-3 pb-1">
+                            <div className="w-10 h-1 bg-zinc-700 rounded-full" />
+                        </div>
+
+                        {/* Header */}
+                        <div className="px-5 py-3 flex items-center justify-between border-b border-zinc-800/60">
+                            <div>
+                                <h2 className="text-white font-semibold text-base">Watch History</h2>
+                                <p className="text-zinc-500 text-xs mt-0.5">{displayHistory.length} titles stored</p>
+                            </div>
+                            <button
+                                onClick={() => { setShowHistoryView(false); setHistorySearch(''); }}
+                                className="p-2 text-zinc-500 hover:text-white transition rounded-lg hover:bg-zinc-800"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        {/* Search */}
+                        <div className="px-4 py-3 border-b border-zinc-800/40">
+                            <div className="relative">
+                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" /></svg>
+                                <input
+                                    type="text"
+                                    value={historySearch}
+                                    onChange={e => setHistorySearch(e.target.value)}
+                                    placeholder="Search titles…"
+                                    className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-zinc-600"
+                                />
+                            </div>
+                        </div>
+
+                        {/* List */}
+                        <div className="overflow-y-auto flex-1 px-2 py-2">
+                            {filteredHistory.length === 0 ? (
+                                <p className="text-zinc-600 text-sm text-center py-10">
+                                    {historySearch ? 'No titles match your search' : 'No titles in history'}
+                                </p>
+                            ) : (
+                                <ul>
+                                    {filteredHistory.map((title, idx) => (
+                                        <li key={idx} className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-zinc-900 group">
+                                            <span className="text-zinc-300 text-sm truncate flex-1 pr-3">{title}</span>
+                                            <button
+                                                onClick={() => removeTitle(title)}
+                                                className="flex-shrink-0 p-1.5 text-zinc-700 hover:text-red-400 hover:bg-zinc-800 rounded-lg transition"
+                                                aria-label={`Remove ${title}`}
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
