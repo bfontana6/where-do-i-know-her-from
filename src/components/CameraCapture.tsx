@@ -211,54 +211,66 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
     return (
         <div className="flex-1 flex flex-col w-full gap-4">
 
-            {/* Two-tile action selector */}
+            {/* Hero + action rows */}
             {!previewUrl && (
-                <div className="flex-1 flex flex-col gap-3">
-                    <div className="flex gap-3 flex-1" style={{ minHeight: '54vh' }}>
+                <div className="flex-1 flex flex-col">
+                    {/* Title */}
+                    <div className="pt-2 pb-10">
+                        <h1 className="text-4xl font-bold text-white leading-tight tracking-tight">
+                            What do I{' '}
+                            <span className="text-indigo-400">know</span>
+                            <br />them from?
+                        </h1>
+                    </div>
 
-                        {/* Camera tile */}
+                    {/* Stacked action rows */}
+                    <div className="flex flex-col gap-0">
+                        {/* Camera row */}
                         <button
                             onClick={() => cameraInputRef.current?.click()}
-                            className="flex-1 relative bg-zinc-950 rounded-2xl border border-zinc-800/70 flex flex-col items-center justify-center gap-4 active:scale-[0.97] outline-none transition-transform duration-100 overflow-hidden"
+                            className="w-full flex items-center gap-4 px-5 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl active:scale-[0.98] outline-none transition-all duration-150"
                         >
-                            <div className="absolute top-3 left-3 w-4 h-4 border-t border-l border-zinc-700" />
-                            <div className="absolute top-3 right-3 w-4 h-4 border-t border-r border-zinc-700" />
-                            <div className="absolute bottom-3 left-3 w-4 h-4 border-b border-l border-zinc-700" />
-                            <div className="absolute bottom-3 right-3 w-4 h-4 border-b border-r border-zinc-700" />
-                            <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-                                <svg className="w-7 h-7 text-zinc-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                            <div className="w-12 h-12 rounded-xl bg-indigo-600/25 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
+                                <svg className="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
                                 </svg>
                             </div>
-                            <div className="text-center px-3">
-                                <p className="text-white font-semibold text-sm">Take Photo</p>
-                                <p className="text-zinc-600 text-xs mt-1 leading-snug">Point at your TV or screen</p>
+                            <div className="flex-1 text-left">
+                                <p className="text-white font-semibold text-base">Take Photo</p>
+                                <p className="text-zinc-500 text-sm">Point at your TV or screen</p>
                             </div>
+                            <svg className="w-5 h-5 text-zinc-600 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                         </button>
 
-                        {/* Library tile */}
+                        {/* OR divider */}
+                        <div className="flex items-center gap-3 py-3 px-2">
+                            <div className="flex-1 h-px bg-zinc-800" />
+                            <span className="text-zinc-600 text-xs font-medium tracking-widest">OR</span>
+                            <div className="flex-1 h-px bg-zinc-800" />
+                        </div>
+
+                        {/* Library row */}
                         <button
                             onClick={() => libraryInputRef.current?.click()}
-                            className="flex-1 relative bg-zinc-950 rounded-2xl border border-zinc-800/70 flex flex-col items-center justify-center gap-4 active:scale-[0.97] outline-none transition-transform duration-100 overflow-hidden"
+                            className="w-full flex items-center gap-4 px-5 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl active:scale-[0.98] outline-none transition-all duration-150"
                         >
-                            <div className="absolute top-3 left-3 w-4 h-4 border-t border-l border-zinc-700" />
-                            <div className="absolute top-3 right-3 w-4 h-4 border-t border-r border-zinc-700" />
-                            <div className="absolute bottom-3 left-3 w-4 h-4 border-b border-l border-zinc-700" />
-                            <div className="absolute bottom-3 right-3 w-4 h-4 border-b border-r border-zinc-700" />
-                            <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-                                <svg className="w-7 h-7 text-zinc-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                            <div className="w-12 h-12 rounded-xl bg-emerald-600/25 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+                                <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                                 </svg>
                             </div>
-                            <div className="text-center px-3">
-                                <p className="text-white font-semibold text-sm">Upload Photo</p>
-                                <p className="text-zinc-600 text-xs mt-1 leading-snug">From your camera roll</p>
+                            <div className="flex-1 text-left">
+                                <p className="text-white font-semibold text-base">Upload Photo</p>
+                                <p className="text-zinc-500 text-sm">From your camera roll</p>
                             </div>
+                            <svg className="w-5 h-5 text-zinc-600 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                         </button>
-
                     </div>
-                    <p className="text-center text-[11px] text-zinc-700">Tip: screenshot your screen first, then tap Upload</p>
+
+                    <p className="text-center text-[11px] text-zinc-700 mt-6">
+                        <span className="text-zinc-600">Tip:</span> Screenshot your screen first, then tap Upload for best results.
+                    </p>
                 </div>
             )}
 

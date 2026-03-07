@@ -24,17 +24,16 @@ export default function Home() {
   if (!isClient) return null; // Avoid hydration mismatch
 
   return (
-    <main className="flex-1 flex flex-col max-w-lg w-full mx-auto px-4 min-h-screen">
-
+    <main
+      className="flex-1 flex flex-col max-w-lg w-full mx-auto px-4 min-h-screen"
+      style={{
+        background: 'radial-gradient(ellipse at 15% 5%, rgba(79,22,130,0.45) 0%, transparent 55%), radial-gradient(ellipse at 85% 95%, rgba(6,78,59,0.35) 0%, transparent 50%)',
+      }}
+    >
       <div className="flex-1 flex flex-col">
 
-        {/* Compact Header */}
-        <header className="py-5 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight leading-tight">
-              Where Do I Know Them From?
-            </h1>
-          </div>
+        {/* Header — hamburger only when history is loaded */}
+        <header className="py-5 flex items-center justify-end min-h-[60px]">
           {watchHistory && watchHistory.length > 0 && (
             <HamburgerMenu watchHistory={watchHistory} onHistoryUpdate={setWatchHistory} />
           )}
