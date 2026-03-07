@@ -37,8 +37,11 @@ export async function POST(request: Request) {
         // Cast will contain movies and tv shows
         for (const credit of credits.cast || []) {
             // TMDB uses 'title' for movies and 'name' for TV shows
-            const title = ('title' in credit ? credit.title : credit.name) as string;
-            const releaseDate = ('release_date' in credit ? credit.release_date : credit.first_air_date) as string;
+            const isMovie = (credit as any).media_type === 'movie';
+            
+            // Apply correct typing manually since the SDK returns a union type that TypeScript struggles with
+            const title = isMovie ? (credit as any).title : (credit as any).name;
+            const releaseDate = isMovie ? (credit as any).release_date : (credit as any).first_air_date;
 
             if (!title) continue;
 
@@ -65,9 +68,9 @@ export async function POST(request: Request) {
             if (isMatch) {
                 matches.push({
                     id: credit.id,
-                    title: title,
+                    title: title as string,
                     character: credit.character,
-                    mediaType: credit.media_type,
+                    mediaType: (credit as any).media_type,
                     posterPath: credit.poster_path ? `https://image.tmdb.org/t/p/w500${credit.poster_path}` : null,
                     releaseYear: releaseDate ? releaseDate.split('-')[0] : 'Unknown',
                     popularity: credit.popularity || 0
@@ -85,14 +88,20 @@ export async function POST(request: Request) {
             .filter(c => c.poster_path) // only items with posters look good
             .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
             .slice(0, 10)
-            .map(credit => ({
-                id: credit.id,
-                title: ('title' in credit ? credit.title : credit.name) as string,
-                character: credit.character,
-                mediaType: credit.media_type,
-                posterPath: `https://image.tmdb.org/t/p/w500${credit.poster_path}`,
-                releaseYear: ('release_date' in credit ? credit.release_date : credit.first_air_date) ? ('release_date' in credit ? credit.release_date : credit.first_air_date)?.split('-')[0] : 'Unknown'
-            }));
+            .map(credit => {
+                const isMovie = (credit as any).media_type === 'movie';
+                const title = isMovie ? (credit as any).title : (credit as any).name;
+                const releaseDate = isMovie ? (credit as any).release_date : (credit as any).first_air_date;
+
+                return {
+                    id: credit.id,
+                    title: title as string,
+                    character: credit.character,
+                    mediaType: (credit as any).media_type,
+                    posterPath: `https://image.tmdb.org/t/p/w500${credit.poster_path}`,
+                    releaseYear: releaseDate ? releaseDate.split('-')[0] : 'Unknown'
+                };
+            });
 
         // Deduplicate top filmography
         const uniqueTopFilmography = Array.from(new Map(topFilmography.map(item => [item.title, item])).values());
