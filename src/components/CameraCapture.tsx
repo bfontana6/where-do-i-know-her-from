@@ -12,6 +12,15 @@ interface ActorResult {
         mediaType: string;
         posterPath: string | null;
         releaseYear: string;
+        popularity?: number;
+    }>;
+    topFilmography?: Array<{
+        id: number;
+        title: string;
+        character: string;
+        mediaType: string;
+        posterPath: string | null;
+        releaseYear: string;
     }>;
 }
 
@@ -21,6 +30,7 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
     const [loadingState, setLoadingState] = useState<'idle' | 'recognizing' | 'cross-referencing'>('idle');
     const [result, setResult] = useState<ActorResult | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -32,6 +42,7 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
         setPreviewUrl(URL.createObjectURL(file));
         setResult(null);
         setError(null);
+        setFeedback(null);
 
         await processImage(file);
     };
@@ -75,7 +86,8 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
             setResult({
                 actorName: crossRefData.actorName,
                 actorId: crossRefData.actorId,
-                matches: crossRefData.matches,
+                matches: crossRefData.matches || [],
+                topFilmography: crossRefData.topFilmography || [],
             });
 
         } catch (err: any) {
@@ -121,6 +133,7 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
                             setPreviewUrl(null);
                             setResult(null);
                             setError(null);
+                            setFeedback(null);
                             setTimeout(() => fileInputRef.current?.click(), 100);
                         }}
                         className="px-4 py-2 bg-zinc-800 text-sm font-medium text-white rounded-full hover:bg-zinc-700 transition"
@@ -161,7 +174,7 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
                         {result.matches.length > 0 ? (
                             <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                                 {result.matches.map((item, idx) => (
-                                    <div key={`${item.id}-${idx}`} className="flex gap-4 p-3 bg-zinc-800/40 rounded-xl border border-zinc-800/50 hover:bg-zinc-800 transition">
+                                    <div key={`match-${item.id}-${idx}`} className="flex gap-4 p-3 bg-zinc-800/40 rounded-xl border border-zinc-800/50 hover:bg-zinc-800 transition">
                                         {item.posterPath ? (
                                             /* eslint-disable-next-line @next/next/no-img-element */
                                             <img src={item.posterPath} alt={item.title} className="w-16 h-24 object-cover rounded-lg shadow" />
@@ -179,10 +192,73 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
                                 ))}
                             </div>
                         ) : (
-                            <div className="p-4 bg-zinc-800/50 rounded-xl text-center">
-                                <p className="text-zinc-400">We couldn&apos;t find any overlaps between their filmography and your uploaded watch history.</p>
+                            <div className="space-y-6">
+                                <div className="p-4 bg-zinc-800/50 rounded-xl text-center border border-zinc-700/50">
+                                    <p className="text-zinc-300">We couldn&apos;t find an exact match between their roles and your uploaded watch history.</p>
+                                </div>
+                                
+                                {result.topFilmography && result.topFilmography.length > 0 && (
+                                    <div>
+                                        <h3 className="text-md font-medium text-zinc-400 mb-3 uppercase tracking-wider text-sm">Top Filmography</h3>
+                                        <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                                            {result.topFilmography.map((item, idx) => (
+                                                <div key={`top-${item.id}-${idx}`} className="flex gap-4 p-3 bg-zinc-900/40 rounded-xl border border-zinc-800/30">
+                                                    {item.posterPath ? (
+                                                        /* eslint-disable-next-line @next/next/no-img-element */
+                                                        <img src={item.posterPath} alt={item.title} className="w-12 h-18 object-cover rounded-md shadow-sm opacity-80" />
+                                                    ) : (
+                                                        <div className="w-12 h-18 bg-zinc-800 rounded-md flex items-center justify-center text-[10px] text-zinc-600 text-center p-1">No Image</div>
+                                                    )}
+                                                    <div className="flex-1 py-1">
+                                                        <h4 className="font-medium text-zinc-200 text-base leading-tight mb-1">{item.title}</h4>
+                                                        <p className="text-zinc-500 text-xs mb-1">{item.releaseYear}</p>
+                                                        {item.character && (
+                                                            <p className="text-xs text-zinc-400">as {item.character}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
+
+                        {/* Feedback Section */}
+                        <div className="mt-6 pt-6 border-t border-zinc-800/80 flex flex-col items-center">
+                            <p className="text-zinc-400 text-sm mb-3">Was this identification correct?</p>
+                            <div className="flex gap-4">
+                                <button 
+                                    onClick={() => setFeedback('up')}
+                                    className={`p-3 rounded-full transition-all ${feedback === 'up' ? 'bg-green-500/20 text-green-400 ring-1 ring-green-500/50' : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-700 hover:text-white'}`}
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"></path></svg>
+                                </button>
+                                <button 
+                                    onClick={() => setFeedback('down')}
+                                    className={`p-3 rounded-full transition-all ${feedback === 'down' ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/50' : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-700 hover:text-white'}`}
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"></path></svg>
+                                </button>
+                            </div>
+                            {feedback && (
+                                <p className="text-xs text-zinc-500 mt-2">Thanks for the feedback!</p>
+                            )}
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                setPreviewUrl(null);
+                                setResult(null);
+                                setError(null);
+                                setFeedback(null);
+                                setTimeout(() => fileInputRef.current?.click(), 100);
+                            }}
+                            className="w-full mt-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            Scan Another Face
+                        </button>
                     </div>
                 </div>
             )}

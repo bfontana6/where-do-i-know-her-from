@@ -18,7 +18,11 @@ export async function POST(request: Request) {
         const bytes = await image.arrayBuffer();
         const buffer = Buffer.from(bytes);
         const base64Image = buffer.toString('base64');
-        const mimeType = image.type || 'image/jpeg';
+        let mimeType = image.type || 'image/jpeg';
+        if (mimeType === 'application/octet-stream') {
+            mimeType = 'image/jpeg';
+        }
+        console.log(`Processing image with mimeType: ${mimeType}`);
 
         // Call Gemini 1.5 Flash (fast and cost-effective for vision tasks)
         const response = await ai.models.generateContent({

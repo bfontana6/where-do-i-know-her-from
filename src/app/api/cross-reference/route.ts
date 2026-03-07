@@ -16,7 +16,7 @@ export async function POST(request: Request) {
         }
 
         // 1. Search for the actor by name
-        const searchResult = await tmdb.search.persons({ query: actorName });
+        const searchResult = await tmdb.search.people({ query: actorName });
 
         if (!searchResult.results || searchResult.results.length === 0) {
             return NextResponse.json({ error: 'Actor not found in TMDB' }, { status: 404 });
@@ -45,10 +45,15 @@ export async function POST(request: Request) {
             const normalizedTitle = title.toLowerCase();
 
             // Check if the title exists in the user's watch history
-            // Netflix titles are often formatted like "The Office: Season 1: Pilot", so partial match is better
-            const isMatch = normalizedHistory.some((historyItem: string) =>
-                historyItem.includes(normalizedTitle) || normalizedTitle.includes(historyItem)
-            );
+            // Use word boundary regex to avoid partial matches (e.g. "hunter" matching inside "the deer hunter")
+            // We want exact title matches against elements in the watch history
+            const escapedTitle = normalizedTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const titleRegex = new RegExp(`\\b${escapedTitle}\\b`);
+
+            const isMatch = normalizedHistory.some((historyItem: string) => {
+                // Return true if the history item exactly contains the title as a standalone word/phrase
+                return titleRegex.test(historyItem) || historyItem === normalizedTitle;
+            });
 
             if (isMatch) {
                 matches.push({
@@ -57,19 +62,40 @@ export async function POST(request: Request) {
                     character: credit.character,
                     mediaType: credit.media_type,
                     posterPath: credit.poster_path ? `https://image.tmdb.org/t/p/w500${credit.poster_path}` : null,
-                    releaseYear: releaseDate ? releaseDate.split('-')[0] : 'Unknown'
+                    releaseYear: releaseDate ? releaseDate.split('-')[0] : 'Unknown',
+                    popularity: credit.popularity || 0
                 });
             }
         }
 
         // Deduplicate matches (e.g., an actor appeared in multiple episodes of a show)
-        const uniqueMatches = Array.from(new Map(matches.map(item => [item.title, item])).values());
+        const uniqueMatches = Array.from(new Map(matches.map(item => [item.title, item])).values())
+            .sort((a, b) => b.popularity - a.popularity);
+
+        // Also prepare top ~10 filmography items to show if there are no/few matches, sorting by popularity
+        const allCredits = credits.cast || [];
+        const topFilmography = allCredits
+            .filter(c => c.poster_path) // only items with posters look good
+            .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+            .slice(0, 10)
+            .map(credit => ({
+                id: credit.id,
+                title: ('title' in credit ? credit.title : credit.name) as string,
+                character: credit.character,
+                mediaType: credit.media_type,
+                posterPath: `https://image.tmdb.org/t/p/w500${credit.poster_path}`,
+                releaseYear: ('release_date' in credit ? credit.release_date : credit.first_air_date) ? ('release_date' in credit ? credit.release_date : credit.first_air_date)?.split('-')[0] : 'Unknown'
+            }));
+
+        // Deduplicate top filmography
+        const uniqueTopFilmography = Array.from(new Map(topFilmography.map(item => [item.title, item])).values());
 
         return NextResponse.json({
             success: true,
             actorId: personId,
             actorName: currentName,
-            matches: uniqueMatches
+            matches: uniqueMatches,
+            topFilmography: uniqueTopFilmography
         });
 
     } catch (error) {
