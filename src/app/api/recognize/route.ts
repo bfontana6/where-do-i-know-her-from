@@ -61,8 +61,27 @@ export async function POST(request: Request) {
             }
         });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error recognizing image with Gemini:', error);
-        return NextResponse.json({ error: 'Failed to process image' }, { status: 500 });
+        
+        let errorMessage = 'Failed to process image';
+        let statusCode = 500;
+
+        // The new GenAI SDK often throws an ApiError with a nested error object
+        if (error.error && error.error.status === 'RESOURCE_EXHAUSTED') {
+            errorMessage = 'API Rate Limit Exceeded. Please wait 30 seconds and try again.';
+            statusCode = 429;
+        } else if (error.error && error.error.message) {
+            errorMessage = error.error.message;
+            statusCode = error.error.code || 500;
+        } else if (error.message) {
+            errorMessage = error.message;
+            if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('quota')) {
+                errorMessage = 'API Rate Limit Exceeded. Please wait 30 seconds and try again.';
+                statusCode = 429;
+            }
+        }
+
+        return NextResponse.json({ error: errorMessage }, { status: statusCode });
     }
 }
