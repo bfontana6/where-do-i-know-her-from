@@ -48,12 +48,19 @@ export async function POST(request: Request) {
             // Use word boundary regex to avoid partial matches (e.g. "hunter" matching inside "the deer hunter")
             // We want exact title matches against elements in the watch history
             const escapedTitle = normalizedTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const titleRegex = new RegExp(`\\b${escapedTitle}\\b`);
-
-            const isMatch = normalizedHistory.some((historyItem: string) => {
-                // Return true if the history item exactly contains the title as a standalone word/phrase
-                return titleRegex.test(historyItem) || historyItem === normalizedTitle;
-            });
+            
+            let isMatch = false;
+            try {
+                const titleRegex = new RegExp(`\\b${escapedTitle}\\b`);
+                isMatch = normalizedHistory.some((historyItem: string) => {
+                    return titleRegex.test(historyItem) || historyItem === normalizedTitle;
+                });
+            } catch (err) {
+                // Fallback to simple matching if regex fails for some weird title edge case
+                isMatch = normalizedHistory.some((historyItem: string) =>
+                    historyItem.includes(normalizedTitle) || normalizedTitle.includes(historyItem)
+                );
+            }
 
             if (isMatch) {
                 matches.push({
