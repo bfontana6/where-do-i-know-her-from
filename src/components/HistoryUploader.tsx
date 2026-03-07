@@ -23,19 +23,32 @@ export default function HistoryUploader({ onHistoryLoaded }: { onHistoryLoaded: 
             complete: (results) => {
                 try {
                     // Netflix CSV usually has 'Title' column
-                    const titles = results.data
+                    const newTitles = results.data
                         .map((row: any) => row.Title)
                         .filter((title: string) => title && title.trim().length > 0);
 
-                    if (titles.length === 0) {
+                    if (newTitles.length === 0) {
                         setError('Could not find any titles in the CSV. Make sure it is a Netflix ViewingActivity.csv format.');
                         setLoading(false);
                         return;
                     }
 
+                    const storedHistory = localStorage.getItem('watchHistory');
+                    let currentTitles: string[] = [];
+                    if (storedHistory) {
+                        try {
+                            currentTitles = JSON.parse(storedHistory);
+                        } catch (e) {
+                            console.error('Failed to parse existing history for merging', e);
+                        }
+                    }
+
+                    const combinedSet = new Set([...currentTitles, ...newTitles]);
+                    const combinedTitles = Array.from(combinedSet);
+
                     // Save to local storage for persistence across reloads
-                    localStorage.setItem('watchHistory', JSON.stringify(titles));
-                    onHistoryLoaded(titles);
+                    localStorage.setItem('watchHistory', JSON.stringify(combinedTitles));
+                    onHistoryLoaded(combinedTitles);
                     setSuccess(true);
                     setLoading(false);
                 } catch (err) {
@@ -53,9 +66,14 @@ export default function HistoryUploader({ onHistoryLoaded }: { onHistoryLoaded: 
     return (
         <div className="bg-zinc-900/50 backdrop-blur-md rounded-2xl p-6 border border-zinc-800 shadow-xl transition-all">
             <h3 className="text-xl font-semibold text-white mb-2">Upload Watch History</h3>
-            <p className="text-zinc-400 text-sm mb-6">
-                Upload your Netflix ViewingActivity.csv file to cross-reference actors with your watched shows.
-            </p>
+            <div className="text-zinc-400 text-sm mb-6 space-y-3">
+                <p>
+                    <strong>How to get your Netflix history:</strong> Go to Netflix Account settings on your browser → Profile & Parental Controls → Viewing activity → <strong>Download all</strong> at the bottom.
+                </p>
+                <p>
+                    You can upload multiple files (e.g., from different profiles or other services that use a "Title" column). We will merge them securely on your device.
+                </p>
+            </div>
 
             <div className="relative">
                 <input
