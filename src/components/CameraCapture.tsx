@@ -145,14 +145,40 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
     return (
         <div className="w-full max-w-md mx-auto relative flex flex-col items-center gap-6">
 
-            {/* Camera Button */}
+            {/* Scan Panel */}
             {!previewUrl && (
                 <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-48 h-48 bg-indigo-600 rounded-full flex flex-col items-center justify-center shadow-[0_0_40px_rgba(79,70,229,0.5)] hover:bg-indigo-500 hover:scale-105 transition-all outline-none border-4 border-zinc-900"
+                    className="group w-full relative h-52 bg-zinc-900/70 rounded-2xl border border-zinc-800 hover:border-indigo-500/40 transition-all duration-300 overflow-hidden flex flex-col items-center justify-center gap-4 active:scale-[0.98] outline-none"
                 >
-                    <svg className="w-12 h-12 text-white mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                    <span className="text-white font-medium text-lg">Tap to Scan</span>
+                    {/* Corner brackets */}
+                    <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-indigo-500/70 rounded-tl" />
+                    <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-indigo-500/70 rounded-tr" />
+                    <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-indigo-500/70 rounded-bl" />
+                    <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-indigo-500/70 rounded-br" />
+
+                    {/* Animated scan line */}
+                    <div
+                        className="absolute left-8 right-8 h-px bg-gradient-to-r from-transparent via-indigo-400/70 to-transparent"
+                        style={{ animation: 'scan-sweep 2.8s ease-in-out infinite' }}
+                    />
+
+                    {/* Icon */}
+                    <div className="w-12 h-12 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center group-hover:border-indigo-500/50 transition-colors duration-300">
+                        {/* Face-scan icon */}
+                        <svg className="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9V6.75A3 3 0 016.75 3.75H9M14.25 3.75H17.25A3 3 0 0120.25 6.75V9M20.25 15v2.25a3 3 0 01-3 3H14.25M9 20.25H6.75a3 3 0 01-3-3V15" />
+                            <circle cx="9" cy="10" r="1" fill="currentColor" strokeWidth="0" />
+                            <circle cx="15" cy="10" r="1" fill="currentColor" strokeWidth="0" />
+                            <path strokeLinecap="round" d="M9 14.5c.8 1 4.2 1 6 0" />
+                        </svg>
+                    </div>
+
+                    {/* Text */}
+                    <div className="text-center">
+                        <p className="text-white font-semibold text-base tracking-tight">Scan a Face</p>
+                        <p className="text-zinc-500 text-sm mt-0.5">Point your camera at the screen</p>
+                    </div>
                 </button>
             )}
 
@@ -166,12 +192,16 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
                 onChange={handleCapture}
             />
 
-            {/* States: Loading, Error, Result */}
+            {/* Preview strip shown while loading / after capture */}
             {previewUrl && (
-                <div className="w-full flex justify-between items-center mb-4">
-                    <div className="relative w-20 h-20 rounded-lg overflow-hidden border-2 border-zinc-700">
+                <div className="w-full flex items-center gap-3 px-1">
+                    <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-zinc-700 flex-shrink-0">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={previewUrl} alt="Preview" className="object-cover w-full h-full" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-xs text-zinc-500 mb-0.5">Your capture</p>
+                        <p className="text-sm text-zinc-300 font-medium truncate">Analyzing scene…</p>
                     </div>
                     <button
                         onClick={() => {
@@ -183,9 +213,9 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
                             setCorrectionName('');
                             setTimeout(() => fileInputRef.current?.click(), 100);
                         }}
-                        className="px-4 py-2 bg-zinc-800 text-sm font-medium text-white rounded-full hover:bg-zinc-700 transition"
+                        className="px-3 py-1.5 bg-zinc-800 text-xs font-medium text-zinc-300 rounded-full hover:bg-zinc-700 hover:text-white transition flex-shrink-0"
                     >
-                        Scan Again
+                        Retake
                     </button>
                 </div>
             )}
