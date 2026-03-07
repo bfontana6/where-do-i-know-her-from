@@ -3,6 +3,17 @@
 import React, { useState, useRef } from 'react';
 import Papa from 'papaparse';
 
+/**
+ * Netflix CSV episode entries look like "Show Name: Season 4: Chapter Nine".
+ * This extracts the base show name so it can match against TMDB credits.
+ */
+function extractTitles(rawTitle: string): string[] {
+    const titles: string[] = [rawTitle];
+    const match = rawTitle.match(/^(.+?):\s*Season\s+\d/i);
+    if (match) titles.push(match[1].trim());
+    return titles;
+}
+
 interface HamburgerMenuProps {
     watchHistory: string[] | null;
     onHistoryUpdate: (newHistory: string[] | null) => void;
@@ -28,7 +39,8 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate }: Hamburg
                 try {
                     const newTitles = results.data
                         .map((row: any) => row.Title)
-                        .filter((title: string) => title && title.trim().length > 0);
+                        .filter((title: string) => title && title.trim().length > 0)
+                        .flatMap((title: string) => extractTitles(title));
 
                     if (newTitles.length > 0) {
                         const currentTitles = watchHistory || [];

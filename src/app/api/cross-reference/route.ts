@@ -24,9 +24,13 @@ export async function POST(request: Request) {
 
         const personId = searchResult.results[0].id;
         const currentName = searchResult.results[0].name;
+        const profilePath = searchResult.results[0].profile_path;
 
-        // 2. Get the actor's combined credits (movies + TV)
-        const credits = await tmdb.people.combinedCredits(personId);
+        // 2. Fetch credits and person details (for imdb_id) in parallel
+        const [credits, personDetails] = await Promise.all([
+            tmdb.people.combinedCredits(personId),
+            tmdb.people.details(personId),
+        ]);
 
         // 3. Cross-reference with watch history
         // For MVP, we'll do a simple lowercase exact or partial match.
@@ -110,6 +114,8 @@ export async function POST(request: Request) {
             success: true,
             actorId: personId,
             actorName: currentName,
+            actorProfilePath: profilePath ? `https://image.tmdb.org/t/p/w185${profilePath}` : null,
+            imdbUrl: (personDetails as any).imdb_id ? `https://www.imdb.com/name/${(personDetails as any).imdb_id}` : null,
             matches: uniqueMatches,
             topFilmography: uniqueTopFilmography
         });

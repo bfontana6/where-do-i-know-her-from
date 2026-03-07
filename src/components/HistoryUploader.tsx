@@ -3,6 +3,20 @@
 import React, { useState, useRef } from 'react';
 import Papa from 'papaparse';
 
+// TODO: Support watch history CSV exports from other streaming services
+// (Hulu, Max/HBO, Disney+, Apple TV+). Each service has its own format/column names.
+
+/**
+ * Netflix CSV episode entries look like "Show Name: Season 4: Chapter Nine".
+ * This extracts the base show name so it can match against TMDB credits.
+ */
+function extractTitles(rawTitle: string): string[] {
+    const titles: string[] = [rawTitle];
+    const match = rawTitle.match(/^(.+?):\s*Season\s+\d/i);
+    if (match) titles.push(match[1].trim());
+    return titles;
+}
+
 export default function HistoryUploader({ onHistoryLoaded }: { onHistoryLoaded: (history: string[]) => void }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -22,10 +36,12 @@ export default function HistoryUploader({ onHistoryLoaded }: { onHistoryLoaded: 
             skipEmptyLines: true,
             complete: (results) => {
                 try {
-                    // Netflix CSV usually has 'Title' column
+                    // Netflix CSV usually has 'Title' column. Episode entries like
+                    // "Show: Season 4: Episode Name" are expanded to also include "Show".
                     const newTitles = results.data
                         .map((row: any) => row.Title)
-                        .filter((title: string) => title && title.trim().length > 0);
+                        .filter((title: string) => title && title.trim().length > 0)
+                        .flatMap((title: string) => extractTitles(title));
 
                     if (newTitles.length === 0) {
                         setError('Could not find any titles in the CSV. Make sure it is a Netflix ViewingActivity.csv format.');

@@ -1,10 +1,16 @@
 'use client';
 
+// TODO: Explore allowing the user to tap/select a specific person when multiple
+// people appear in the submitted scene image.
+// TODO: Support identifying all people in a scene simultaneously (batch results).
+
 import React, { useRef, useState } from 'react';
 
 interface ActorResult {
     actorName: string;
     actorId: number;
+    actorProfilePath?: string | null;
+    imdbUrl?: string | null;
     matches: Array<{
         id: number;
         title: string;
@@ -31,6 +37,8 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
     const [result, setResult] = useState<ActorResult | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
+    const [showCorrectionInput, setShowCorrectionInput] = useState(false);
+    const [correctionName, setCorrectionName] = useState('');
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,6 +51,8 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
         setResult(null);
         setError(null);
         setFeedback(null);
+        setShowCorrectionInput(false);
+        setCorrectionName('');
 
         await processImage(file);
     };
@@ -86,10 +96,45 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
             setResult({
                 actorName: crossRefData.actorName,
                 actorId: crossRefData.actorId,
+                actorProfilePath: crossRefData.actorProfilePath || null,
+                imdbUrl: crossRefData.imdbUrl || null,
                 matches: crossRefData.matches || [],
                 topFilmography: crossRefData.topFilmography || [],
             });
 
+        } catch (err: any) {
+            setError(err.message || 'An unexpected error occurred');
+        } finally {
+            setLoadingState('idle');
+        }
+    };
+
+    // Used when the user corrects a misidentified actor by name.
+    // TODO: Also allow the user to enter the show/episode title they're watching
+    // and surface a list of likely cast candidates to choose from.
+    const lookupActor = async (actorName: string) => {
+        setShowCorrectionInput(false);
+        setCorrectionName('');
+        setResult(null);
+        setError(null);
+        setFeedback(null);
+        try {
+            setLoadingState('cross-referencing');
+            const crossRefRes = await fetch('/api/cross-reference', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actorName, watchHistory }),
+            });
+            const crossRefData = await crossRefRes.json();
+            if (!crossRefRes.ok) throw new Error(crossRefData.error || 'Failed to cross reference');
+            setResult({
+                actorName: crossRefData.actorName,
+                actorId: crossRefData.actorId,
+                actorProfilePath: crossRefData.actorProfilePath || null,
+                imdbUrl: crossRefData.imdbUrl || null,
+                matches: crossRefData.matches || [],
+                topFilmography: crossRefData.topFilmography || [],
+            });
         } catch (err: any) {
             setError(err.message || 'An unexpected error occurred');
         } finally {
@@ -134,6 +179,8 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
                             setResult(null);
                             setError(null);
                             setFeedback(null);
+                            setShowCorrectionInput(false);
+                            setCorrectionName('');
                             setTimeout(() => fileInputRef.current?.click(), 100);
                         }}
                         className="px-4 py-2 bg-zinc-800 text-sm font-medium text-white rounded-full hover:bg-zinc-700 transition"
@@ -164,8 +211,69 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
             {result && (
                 <div className="w-full bg-zinc-900 rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="p-6 bg-gradient-to-b from-indigo-900/40 to-transparent border-b border-zinc-800/50">
-                        <p className="text-zinc-400 text-sm uppercase tracking-wider mb-1">Actor Identified!</p>
-                        <h2 className="text-3xl font-bold text-white">{result.actorName}</h2>
+                        <p className="text-zinc-400 text-sm uppercase tracking-wider mb-3">Actor Identified!</p>
+                        <div className="flex items-center gap-4">
+                            {result.actorProfilePath && (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                    src={result.actorProfilePath}
+                                    alt={result.actorName}
+                                    className="w-16 h-16 rounded-full object-cover border-2 border-indigo-500/60 shadow-lg flex-shrink-0"
+                                />
+                            )}
+                            <div className="flex-1 min-w-0">
+                                <h2 className="text-3xl font-bold text-white leading-tight">{result.actorName}</h2>
+                                <div className="flex items-center gap-3 mt-1 flex-wrap">
+                                    {result.imdbUrl && (
+                                        <a
+                                            href={result.imdbUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-yellow-400 hover:text-yellow-300 text-sm font-medium transition-colors"
+                                        >
+                                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M14 3v2h-4V3H6v18h4v-2h4v2h4V3h-4zm-4 14v-2h4v2h-4zm0-10h4v2h-4V7z"/></svg>
+                                            IMDb
+                                        </a>
+                                    )}
+                                    {!showCorrectionInput ? (
+                                        <button
+                                            onClick={() => setShowCorrectionInput(true)}
+                                            className="text-zinc-500 hover:text-zinc-300 text-xs transition-colors underline underline-offset-2"
+                                        >
+                                            Wrong person?
+                                        </button>
+                                    ) : (
+                                        <form
+                                            onSubmit={(e) => { e.preventDefault(); if (correctionName.trim()) lookupActor(correctionName.trim()); }}
+                                            className="flex items-center gap-2 mt-2 w-full"
+                                        >
+                                            <input
+                                                autoFocus
+                                                type="text"
+                                                value={correctionName}
+                                                onChange={(e) => setCorrectionName(e.target.value)}
+                                                placeholder="Enter correct actor name"
+                                                className="flex-1 bg-zinc-800 border border-zinc-600 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-zinc-500"
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={!correctionName.trim()}
+                                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-lg transition disabled:opacity-50"
+                                            >
+                                                Look up
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setShowCorrectionInput(false); setCorrectionName(''); }}
+                                                className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs font-medium rounded-lg transition"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </form>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="p-6">
