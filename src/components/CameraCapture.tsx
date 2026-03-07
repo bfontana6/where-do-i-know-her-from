@@ -40,7 +40,20 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
     const [showCorrectionInput, setShowCorrectionInput] = useState(false);
     const [correctionName, setCorrectionName] = useState('');
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const cameraInputRef = useRef<HTMLInputElement>(null);
+    const libraryInputRef = useRef<HTMLInputElement>(null);
+
+    const resetAll = () => {
+        setPreviewUrl(null);
+        setImage(null);
+        setResult(null);
+        setError(null);
+        setFeedback(null);
+        setShowCorrectionInput(false);
+        setCorrectionName('');
+        if (cameraInputRef.current) cameraInputRef.current.value = '';
+        if (libraryInputRef.current) libraryInputRef.current.value = '';
+    };
 
     const handleCapture = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -145,56 +158,63 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
     return (
         <div className="flex-1 flex flex-col w-full gap-4">
 
-            {/* Scan Panel — fills remaining viewport height */}
+            {/* Two-tile action selector */}
             {!previewUrl && (
-                <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="group flex-1 w-full relative min-h-[56vh] rounded-3xl border border-zinc-800/80 overflow-hidden flex flex-col items-center justify-center gap-6 active:scale-[0.99] outline-none transition-transform duration-150"
-                    style={{ background: 'radial-gradient(ellipse at 50% 42%, rgba(79,70,229,0.09) 0%, transparent 62%), #09090b' }}
-                >
-                    {/* Corner brackets */}
-                    <div className="absolute top-5 left-5 w-8 h-8 border-t-2 border-l-2 border-indigo-500/50" />
-                    <div className="absolute top-5 right-5 w-8 h-8 border-t-2 border-r-2 border-indigo-500/50" />
-                    <div className="absolute bottom-5 left-5 w-8 h-8 border-b-2 border-l-2 border-indigo-500/50" />
-                    <div className="absolute bottom-5 right-5 w-8 h-8 border-b-2 border-r-2 border-indigo-500/50" />
+                <div className="flex-1 flex flex-col gap-3">
+                    <div className="flex gap-3 flex-1" style={{ minHeight: '54vh' }}>
 
-                    {/* Animated scan line */}
-                    <div
-                        className="absolute left-10 right-10 h-px bg-gradient-to-r from-transparent via-indigo-400/50 to-transparent"
-                        style={{ animation: 'scan-sweep 3s ease-in-out infinite' }}
-                    />
+                        {/* Camera tile */}
+                        <button
+                            onClick={() => cameraInputRef.current?.click()}
+                            className="flex-1 relative bg-zinc-950 rounded-2xl border border-zinc-800/70 flex flex-col items-center justify-center gap-4 active:scale-[0.97] outline-none transition-transform duration-100 overflow-hidden"
+                        >
+                            <div className="absolute top-3 left-3 w-4 h-4 border-t border-l border-zinc-700" />
+                            <div className="absolute top-3 right-3 w-4 h-4 border-t border-r border-zinc-700" />
+                            <div className="absolute bottom-3 left-3 w-4 h-4 border-b border-l border-zinc-700" />
+                            <div className="absolute bottom-3 right-3 w-4 h-4 border-b border-r border-zinc-700" />
+                            <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                                <svg className="w-7 h-7 text-zinc-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+                                </svg>
+                            </div>
+                            <div className="text-center px-3">
+                                <p className="text-white font-semibold text-sm">Take Photo</p>
+                                <p className="text-zinc-600 text-xs mt-1 leading-snug">Point at your TV or screen</p>
+                            </div>
+                        </button>
 
-                    {/* Icon + text */}
-                    <div className="flex flex-col items-center gap-5">
-                        <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-700/80 flex items-center justify-center shadow-inner">
-                            <svg className="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9V6.75A3 3 0 016.75 3.75H9M14.25 3.75H17.25A3 3 0 0120.25 6.75V9M20.25 15v2.25a3 3 0 01-3 3H14.25M9 20.25H6.75a3 3 0 01-3-3V15" />
-                                <circle cx="9" cy="10" r="1" fill="currentColor" strokeWidth="0" />
-                                <circle cx="15" cy="10" r="1" fill="currentColor" strokeWidth="0" />
-                                <path strokeLinecap="round" d="M9 14.5c.8 1 4.2 1 6 0" />
-                            </svg>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-white font-semibold text-lg tracking-tight">Scan a Face</p>
-                            <p className="text-zinc-500 text-sm mt-1.5 leading-relaxed">
-                                Screenshot what you&apos;re watching<br />and tap to identify the actor
-                            </p>
-                        </div>
+                        {/* Library tile */}
+                        <button
+                            onClick={() => libraryInputRef.current?.click()}
+                            className="flex-1 relative bg-zinc-950 rounded-2xl border border-zinc-800/70 flex flex-col items-center justify-center gap-4 active:scale-[0.97] outline-none transition-transform duration-100 overflow-hidden"
+                        >
+                            <div className="absolute top-3 left-3 w-4 h-4 border-t border-l border-zinc-700" />
+                            <div className="absolute top-3 right-3 w-4 h-4 border-t border-r border-zinc-700" />
+                            <div className="absolute bottom-3 left-3 w-4 h-4 border-b border-l border-zinc-700" />
+                            <div className="absolute bottom-3 right-3 w-4 h-4 border-b border-r border-zinc-700" />
+                            <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                                <svg className="w-7 h-7 text-zinc-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                                </svg>
+                            </div>
+                            <div className="text-center px-3">
+                                <p className="text-white font-semibold text-sm">Upload Photo</p>
+                                <p className="text-zinc-600 text-xs mt-1 leading-snug">From your camera roll</p>
+                            </div>
+                        </button>
+
                     </div>
-                </button>
+                    <p className="text-center text-[11px] text-zinc-700">Tip: screenshot your screen first, then tap Upload</p>
+                </div>
             )}
 
-            {/* Hidden File Input */}
-            <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                ref={fileInputRef}
-                onChange={handleCapture}
-            />
+            {/* Camera input — opens camera directly */}
+            <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleCapture} />
+            {/* Library input — opens photo picker */}
+            <input type="file" accept="image/*" className="hidden" ref={libraryInputRef} onChange={handleCapture} />
 
-            {/* Preview strip shown while loading / after capture */}
+            {/* Preview strip */}
             {previewUrl && (
                 <div className="w-full flex items-center gap-3 px-1">
                     <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-zinc-700 flex-shrink-0">
@@ -205,19 +225,8 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
                         <p className="text-xs text-zinc-500 mb-0.5">Your capture</p>
                         <p className="text-sm text-zinc-300 font-medium truncate">Analyzing scene…</p>
                     </div>
-                    <button
-                        onClick={() => {
-                            setPreviewUrl(null);
-                            setResult(null);
-                            setError(null);
-                            setFeedback(null);
-                            setShowCorrectionInput(false);
-                            setCorrectionName('');
-                            setTimeout(() => fileInputRef.current?.click(), 100);
-                        }}
-                        className="px-3 py-1.5 bg-zinc-800 text-xs font-medium text-zinc-300 rounded-full hover:bg-zinc-700 hover:text-white transition flex-shrink-0"
-                    >
-                        Retake
+                    <button onClick={resetAll} className="px-3 py-1.5 bg-zinc-800 text-xs font-medium text-zinc-300 rounded-full hover:bg-zinc-700 hover:text-white transition flex-shrink-0">
+                        New scan
                     </button>
                 </div>
             )}
@@ -235,8 +244,24 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
             )}
 
             {error && (
-                <div className="w-full p-4 bg-red-900/30 border border-red-800 text-red-400 rounded-xl text-center">
-                    {error}
+                <div className="w-full p-5 bg-zinc-900 border border-zinc-800 rounded-2xl flex flex-col items-center gap-3">
+                    <p className="text-red-400 text-sm text-center">{error}</p>
+                    <div className="flex gap-2">
+                        {image && (
+                            <button
+                                onClick={() => { setError(null); processImage(image); }}
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition"
+                            >
+                                Try Again
+                            </button>
+                        )}
+                        <button
+                            onClick={resetAll}
+                            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium rounded-xl transition"
+                        >
+                            New Scan
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -387,16 +412,9 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
                         </div>
 
                         <button
-                            onClick={() => {
-                                setPreviewUrl(null);
-                                setResult(null);
-                                setError(null);
-                                setFeedback(null);
-                                setTimeout(() => fileInputRef.current?.click(), 100);
-                            }}
-                            className="w-full mt-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2"
+                            onClick={resetAll}
+                            className="w-full mt-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shadow-lg transition-transform active:scale-95"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                             Scan Another Face
                         </button>
                     </div>
