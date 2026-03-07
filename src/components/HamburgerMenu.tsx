@@ -26,6 +26,8 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate }: Hamburg
     const [historySearch, setHistorySearch] = useState('');
     const [singleTitle, setSingleTitle] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showAddInSheet, setShowAddInSheet] = useState(false);
+    const [newTitleInSheet, setNewTitleInSheet] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // For the viewer, show only "clean" titles — not raw Netflix episode strings
@@ -50,6 +52,17 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate }: Hamburg
             localStorage.setItem('watchHistory', JSON.stringify(updated));
             onHistoryUpdate(updated);
         }
+    };
+
+    const handleAddInSheet = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newTitleInSheet.trim()) return;
+        const currentTitles = watchHistory || [];
+        const combinedTitles = Array.from(new Set([...currentTitles, newTitleInSheet.trim()]));
+        localStorage.setItem('watchHistory', JSON.stringify(combinedTitles));
+        onHistoryUpdate(combinedTitles);
+        setNewTitleInSheet('');
+        setShowAddInSheet(false);
     };
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -228,7 +241,7 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate }: Hamburg
             {showHistoryView && (
                 <div
                     className="fixed inset-0 z-[200] bg-black/70 flex flex-col justify-end"
-                    onClick={() => { setShowHistoryView(false); setHistorySearch(''); }}
+                    onClick={() => { setShowHistoryView(false); setHistorySearch(''); setShowAddInSheet(false); setNewTitleInSheet(''); }}
                 >
                     <div
                         className="bg-zinc-950 border-t border-zinc-800 rounded-t-3xl flex flex-col animate-in slide-in-from-bottom-4 duration-300"
@@ -246,27 +259,59 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate }: Hamburg
                                 <h2 className="text-white font-semibold text-base">Watch History</h2>
                                 <p className="text-zinc-500 text-xs mt-0.5">{displayHistory.length} titles stored</p>
                             </div>
-                            <button
-                                onClick={() => { setShowHistoryView(false); setHistorySearch(''); }}
-                                className="p-2 text-zinc-500 hover:text-white transition rounded-lg hover:bg-zinc-800"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                        </div>
-
-                        {/* Search */}
-                        <div className="px-4 py-3 border-b border-zinc-800/40">
-                            <div className="relative">
-                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" /></svg>
-                                <input
-                                    type="text"
-                                    value={historySearch}
-                                    onChange={e => setHistorySearch(e.target.value)}
-                                    placeholder="Search titles…"
-                                    className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-zinc-600"
-                                />
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => { setShowAddInSheet(!showAddInSheet); setHistorySearch(''); }}
+                                    className="p-2 text-emerald-400 hover:text-emerald-300 transition rounded-lg hover:bg-zinc-800"
+                                    aria-label="Add title"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                                </button>
+                                <button
+                                    onClick={() => { setShowHistoryView(false); setHistorySearch(''); setShowAddInSheet(false); setNewTitleInSheet(''); }}
+                                    className="p-2 text-zinc-500 hover:text-white transition rounded-lg hover:bg-zinc-800"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
                             </div>
                         </div>
+
+                        {/* Inline add form */}
+                        {showAddInSheet && (
+                            <form onSubmit={handleAddInSheet} className="px-4 py-3 border-b border-zinc-800/40 flex gap-2 animate-in fade-in duration-150">
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    value={newTitleInSheet}
+                                    onChange={e => setNewTitleInSheet(e.target.value)}
+                                    placeholder="Movie or show title…"
+                                    className="flex-1 bg-zinc-900 border border-zinc-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 placeholder-zinc-600"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={!newTitleInSheet.trim()}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-xl transition disabled:opacity-40"
+                                >
+                                    Add
+                                </button>
+                            </form>
+                        )}
+
+                        {/* Search */}
+                        {!showAddInSheet && (
+                            <div className="px-4 py-3 border-b border-zinc-800/40">
+                                <div className="relative">
+                                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" /></svg>
+                                    <input
+                                        type="text"
+                                        value={historySearch}
+                                        onChange={e => setHistorySearch(e.target.value)}
+                                        placeholder="Search titles…"
+                                        className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-zinc-600"
+                                    />
+                                </div>
+                            </div>
+                        )}
 
                         {/* List */}
                         <div className="overflow-y-auto flex-1 px-2 py-2">
