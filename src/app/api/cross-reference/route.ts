@@ -36,13 +36,14 @@ export async function POST(request: Request) {
         // For MVP, we'll do a simple lowercase exact or partial match.
         const normalizedHistory = (watchHistory || []).map((t: string) => t.toLowerCase());
 
-        const matches = [];
+        const exactMatches = [];
+        const fuzzyMatches = [];
 
         // Cast will contain movies and tv shows
         for (const credit of credits.cast || []) {
             // TMDB uses 'title' for movies and 'name' for TV shows
             const isMovie = (credit as any).media_type === 'movie';
-            
+
             // Apply correct typing manually since the SDK returns a union type that TypeScript struggles with
             const title = isMovie ? (credit as any).title : (credit as any).name;
             const releaseDate = isMovie ? (credit as any).release_date : (credit as any).first_air_date;
@@ -51,26 +52,36 @@ export async function POST(request: Request) {
 
             const normalizedTitle = title.toLowerCase();
 
-            // Check if the title exists in the user's watch history
-            // Use word boundary regex to avoid partial matches (e.g. "hunter" matching inside "the deer hunter")
-            // We want exact title matches against elements in the watch history
+            // Exact match: history contains an item that is exactly this title
+            const isExact = normalizedHistory.some((h: string) => h === normalizedTitle);
+
+            if (isExact) {
+                exactMatches.push({
+                    id: credit.id,
+                    title: title as string,
+                    character: credit.character,
+                    mediaType: (credit as any).media_type,
+                    posterPath: credit.poster_path ? `https://image.tmdb.org/t/p/w500${credit.poster_path}` : null,
+                    releaseYear: releaseDate ? releaseDate.split('-')[0] : 'Unknown',
+                    popularity: credit.popularity || 0
+                });
+                continue;
+            }
+
+            // Fuzzy match: word-boundary regex finds the title within a history item
             const escapedTitle = normalizedTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            
-            let isMatch = false;
+            let isFuzzy = false;
             try {
                 const titleRegex = new RegExp(`\\b${escapedTitle}\\b`);
-                isMatch = normalizedHistory.some((historyItem: string) => {
-                    return titleRegex.test(historyItem) || historyItem === normalizedTitle;
-                });
+                isFuzzy = normalizedHistory.some((historyItem: string) => titleRegex.test(historyItem));
             } catch (err) {
-                // Fallback to simple matching if regex fails for some weird title edge case
-                isMatch = normalizedHistory.some((historyItem: string) =>
+                isFuzzy = normalizedHistory.some((historyItem: string) =>
                     historyItem.includes(normalizedTitle) || normalizedTitle.includes(historyItem)
                 );
             }
 
-            if (isMatch) {
-                matches.push({
+            if (isFuzzy) {
+                fuzzyMatches.push({
                     id: credit.id,
                     title: title as string,
                     character: credit.character,
@@ -82,9 +93,14 @@ export async function POST(request: Request) {
             }
         }
 
-        // Deduplicate matches (e.g., an actor appeared in multiple episodes of a show)
-        const uniqueMatches = Array.from(new Map(matches.map(item => [item.title, item])).values())
+        // Deduplicate and sort each list
+        const uniqueExactMatches = Array.from(new Map(exactMatches.map(item => [item.title, item])).values())
             .sort((a, b) => b.popularity - a.popularity);
+        const uniqueFuzzyMatches = Array.from(new Map(fuzzyMatches.map(item => [item.title, item])).values())
+            .sort((a, b) => b.popularity - a.popularity);
+
+        // Keep legacy `matches` as exact-only for backwards compatibility
+        const uniqueMatches = uniqueExactMatches;
 
         // Also prepare top ~10 filmography items to show if there are no/few matches, sorting by popularity
         const allCredits = credits.cast || [];
@@ -117,6 +133,7 @@ export async function POST(request: Request) {
             actorProfilePath: profilePath ? `https://image.tmdb.org/t/p/w185${profilePath}` : null,
             imdbUrl: (personDetails as any).imdb_id ? `https://www.imdb.com/name/${(personDetails as any).imdb_id}` : null,
             matches: uniqueMatches,
+            fuzzyMatches: uniqueFuzzyMatches,
             topFilmography: uniqueTopFilmography
         });
 

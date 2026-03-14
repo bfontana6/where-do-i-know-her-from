@@ -6,20 +6,23 @@
 
 import React, { useRef, useState } from 'react';
 
+interface MatchItem {
+    id: number;
+    title: string;
+    character: string;
+    mediaType: string;
+    posterPath: string | null;
+    releaseYear: string;
+    popularity?: number;
+}
+
 interface ActorResult {
     actorName: string;
     actorId: number;
     actorProfilePath?: string | null;
     imdbUrl?: string | null;
-    matches: Array<{
-        id: number;
-        title: string;
-        character: string;
-        mediaType: string;
-        posterPath: string | null;
-        releaseYear: string;
-        popularity?: number;
-    }>;
+    matches: MatchItem[];
+    fuzzyMatches?: MatchItem[];
     topFilmography?: Array<{
         id: number;
         title: string;
@@ -148,6 +151,7 @@ export default function CameraCapture({ watchHistory, onHistoryUpdate }: { watch
                 actorProfilePath: crossRefData.actorProfilePath || null,
                 imdbUrl: crossRefData.imdbUrl || null,
                 matches: crossRefData.matches || [],
+                fuzzyMatches: crossRefData.fuzzyMatches || [],
                 topFilmography: crossRefData.topFilmography || [],
             });
 
@@ -214,6 +218,7 @@ export default function CameraCapture({ watchHistory, onHistoryUpdate }: { watch
                 actorProfilePath: crossRefData.actorProfilePath || null,
                 imdbUrl: crossRefData.imdbUrl || null,
                 matches: crossRefData.matches || [],
+                fuzzyMatches: crossRefData.fuzzyMatches || [],
                 topFilmography: crossRefData.topFilmography || [],
             });
         } catch (err: any) {
@@ -527,27 +532,58 @@ export default function CameraCapture({ watchHistory, onHistoryUpdate }: { watch
                     </div>
 
                     <div className="p-6">
-                        <h3 className="text-lg font-semibold text-zinc-200 mb-4">You&apos;ve seen them in:</h3>
-
-                        {result.matches.length > 0 ? (
-                            <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                                {result.matches.map((item, idx) => (
-                                    <div key={`match-${item.id}-${idx}`} className="flex gap-4 p-3 bg-zinc-800/40 rounded-xl border border-zinc-800/50 hover:bg-zinc-800 transition">
-                                        {item.posterPath ? (
-                                            /* eslint-disable-next-line @next/next/no-img-element */
-                                            <img src={item.posterPath} alt={item.title} className="w-16 h-24 object-cover rounded-lg shadow" />
-                                        ) : (
-                                            <div className="w-16 h-24 bg-zinc-800 rounded-lg flex items-center justify-center text-xs text-zinc-500 text-center p-1">No Image</div>
-                                        )}
-                                        <div className="flex-1 py-1">
-                                            <h4 className="font-semibold text-white text-lg leading-tight mb-1">{item.title}</h4>
-                                            <p className="text-zinc-400 text-sm mb-1">{item.releaseYear}</p>
-                                            {item.character && (
-                                                <p className="text-sm text-indigo-300">as {item.character}</p>
-                                            )}
+                        {(result.matches.length > 0 || (result.fuzzyMatches && result.fuzzyMatches.length > 0)) ? (
+                            <div className="space-y-5 max-h-[55vh] overflow-y-auto pr-2 custom-scrollbar">
+                                {result.matches.length > 0 && (
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider mb-3">You&apos;ve seen them in:</h3>
+                                        <div className="space-y-3">
+                                            {result.matches.map((item, idx) => (
+                                                <div key={`match-${item.id}-${idx}`} className="flex gap-4 p-3 bg-zinc-800/40 rounded-xl border border-zinc-800/50 hover:bg-zinc-800 transition">
+                                                    {item.posterPath ? (
+                                                        /* eslint-disable-next-line @next/next/no-img-element */
+                                                        <img src={item.posterPath} alt={item.title} className="w-16 h-24 object-cover rounded-lg shadow" />
+                                                    ) : (
+                                                        <div className="w-16 h-24 bg-zinc-800 rounded-lg flex items-center justify-center text-xs text-zinc-500 text-center p-1">No Image</div>
+                                                    )}
+                                                    <div className="flex-1 py-1">
+                                                        <h4 className="font-semibold text-white text-lg leading-tight mb-1">{item.title}</h4>
+                                                        <p className="text-zinc-400 text-sm mb-1">{item.releaseYear}</p>
+                                                        {item.character && (
+                                                            <p className="text-sm text-indigo-300">as {item.character}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
-                                ))}
+                                )}
+
+                                {result.fuzzyMatches && result.fuzzyMatches.length > 0 && (
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-1">You may have seen them in:</h3>
+                                        <p className="text-zinc-600 text-xs mb-3">Similar titles found in your history</p>
+                                        <div className="space-y-2">
+                                            {result.fuzzyMatches.map((item, idx) => (
+                                                <div key={`fuzzy-${item.id}-${idx}`} className="flex gap-3 p-3 bg-zinc-800/20 rounded-xl border border-zinc-800/30 hover:bg-zinc-800/40 transition opacity-80">
+                                                    {item.posterPath ? (
+                                                        /* eslint-disable-next-line @next/next/no-img-element */
+                                                        <img src={item.posterPath} alt={item.title} className="w-12 h-16 object-cover rounded-md shadow opacity-70" />
+                                                    ) : (
+                                                        <div className="w-12 h-16 bg-zinc-800 rounded-md flex items-center justify-center text-xs text-zinc-600 text-center p-1">?</div>
+                                                    )}
+                                                    <div className="flex-1 py-1">
+                                                        <h4 className="font-medium text-zinc-400 text-base leading-tight mb-0.5">{item.title}</h4>
+                                                        <p className="text-zinc-600 text-sm mb-0.5">{item.releaseYear}</p>
+                                                        {item.character && (
+                                                            <p className="text-sm text-zinc-500">as {item.character}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <div className="space-y-5">
