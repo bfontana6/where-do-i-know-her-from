@@ -47,7 +47,7 @@ export default function Home() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col animate-in fade-in duration-500">
-              <CameraCapture watchHistory={watchHistory} />
+              <CameraCapture watchHistory={watchHistory} onHistoryUpdate={setWatchHistory} />
             </div>
           )}
         </div>

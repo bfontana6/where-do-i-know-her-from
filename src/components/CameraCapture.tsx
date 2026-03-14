@@ -37,7 +37,7 @@ interface CastMember {
     profilePath: string | null;
 }
 
-export default function CameraCapture({ watchHistory }: { watchHistory: string[] }) {
+export default function CameraCapture({ watchHistory, onHistoryUpdate }: { watchHistory: string[]; onHistoryUpdate?: (h: string[]) => void }) {
     const [image, setImage] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [loadingState, setLoadingState] = useState<'idle' | 'recognizing' | 'cross-referencing' | 'cast-lookup'>('idle');
@@ -46,6 +46,11 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
     const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
     const [showCorrectionInput, setShowCorrectionInput] = useState(false);
     const [correctionName, setCorrectionName] = useState('');
+
+    // Add-to-history from results
+    const [addedTitles, setAddedTitles] = useState<Set<string>>(new Set());
+    const [showAddCustomTitle, setShowAddCustomTitle] = useState(false);
+    const [customTitleValue, setCustomTitleValue] = useState('');
 
     // "Not found" helper flow
     const [actorNotFound, setActorNotFound] = useState(false);
@@ -72,6 +77,9 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
         setHelperShowName('');
         setCastResults(null);
         setCastMediaTitle('');
+        setAddedTitles(new Set());
+        setShowAddCustomTitle(false);
+        setCustomTitleValue('');
         if (cameraInputRef.current) cameraInputRef.current.value = '';
         if (libraryInputRef.current) libraryInputRef.current.value = '';
     };
@@ -148,6 +156,13 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
         } finally {
             setLoadingState('idle');
         }
+    };
+
+    const addTitleToHistory = (title: string) => {
+        const updated = Array.from(new Set([...watchHistory, title]));
+        localStorage.setItem('watchHistory', JSON.stringify(updated));
+        onHistoryUpdate?.(updated);
+        setAddedTitles(prev => new Set([...prev, title]));
     };
 
     const lookupShowCast = async (showName: string) => {
@@ -535,35 +550,70 @@ export default function CameraCapture({ watchHistory }: { watchHistory: string[]
                                 ))}
                             </div>
                         ) : (
-                            <div className="space-y-6">
-                                <div className="p-4 bg-zinc-800/50 rounded-xl text-center border border-zinc-700/50">
-                                    <p className="text-zinc-300">We couldn&apos;t find an exact match between their roles and your uploaded watch history.</p>
-                                </div>
-                                
+                            <div className="space-y-5">
+                                <p className="text-zinc-500 text-sm text-center">Not in your watch history yet. You might know them from:</p>
+
                                 {result.topFilmography && result.topFilmography.length > 0 && (
-                                    <div>
-                                        <h3 className="text-md font-medium text-zinc-400 mb-3 uppercase tracking-wider text-sm">Top Filmography</h3>
-                                        <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
-                                            {result.topFilmography.map((item, idx) => (
-                                                <div key={`top-${item.id}-${idx}`} className="flex gap-4 p-3 bg-zinc-900/40 rounded-xl border border-zinc-800/30">
+                                    <div className="space-y-2">
+                                        {result.topFilmography.slice(0, 5).map((item, idx) => {
+                                            const added = addedTitles.has(item.title);
+                                            return (
+                                                <div key={`top-${item.id}-${idx}`} className="flex gap-3 p-3 bg-zinc-800/40 rounded-xl border border-zinc-800/50 items-center">
                                                     {item.posterPath ? (
                                                         /* eslint-disable-next-line @next/next/no-img-element */
-                                                        <img src={item.posterPath} alt={item.title} className="w-12 h-18 object-cover rounded-md shadow-sm opacity-80" />
+                                                        <img src={item.posterPath} alt={item.title} className="w-10 h-14 object-cover rounded-md shadow-sm flex-shrink-0" />
                                                     ) : (
-                                                        <div className="w-12 h-18 bg-zinc-800 rounded-md flex items-center justify-center text-[10px] text-zinc-600 text-center p-1">No Image</div>
+                                                        <div className="w-10 h-14 bg-zinc-800 rounded-md flex items-center justify-center text-[10px] text-zinc-600 flex-shrink-0">?</div>
                                                     )}
-                                                    <div className="flex-1 py-1">
-                                                        <h4 className="font-medium text-zinc-200 text-base leading-tight mb-1">{item.title}</h4>
-                                                        <p className="text-zinc-500 text-xs mb-1">{item.releaseYear}</p>
-                                                        {item.character && (
-                                                            <p className="text-xs text-zinc-400">as {item.character}</p>
-                                                        )}
+                                                    <div className="flex-1 min-w-0 py-0.5">
+                                                        <p className="font-medium text-white text-sm leading-tight truncate">{item.title}</p>
+                                                        <p className="text-zinc-500 text-xs mt-0.5">{item.releaseYear}</p>
+                                                        {item.character && <p className="text-xs text-zinc-400 truncate">as {item.character}</p>}
                                                     </div>
+                                                    <button
+                                                        onClick={() => !added && addTitleToHistory(item.title)}
+                                                        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition ${added ? 'bg-emerald-600/20 text-emerald-400' : 'bg-zinc-700 hover:bg-emerald-600 text-zinc-400 hover:text-white'}`}
+                                                        aria-label={added ? 'Added' : `Add ${item.title} to history`}
+                                                    >
+                                                        {added
+                                                            ? <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                                            : <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                                                        }
+                                                    </button>
                                                 </div>
-                                            ))}
-                                        </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
+
+                                {/* Add the title you're watching now */}
+                                <div className="pt-1 border-t border-zinc-800/60">
+                                    {!showAddCustomTitle ? (
+                                        <button
+                                            onClick={() => setShowAddCustomTitle(true)}
+                                            className="w-full flex items-center gap-2 px-4 py-3 bg-zinc-800/50 hover:bg-zinc-800 border border-dashed border-zinc-700 rounded-xl transition text-sm text-zinc-400 hover:text-white"
+                                        >
+                                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                                            Add the title you&apos;re watching now
+                                        </button>
+                                    ) : (
+                                        <form
+                                            onSubmit={(e) => { e.preventDefault(); if (customTitleValue.trim()) { addTitleToHistory(customTitleValue.trim()); setCustomTitleValue(''); setShowAddCustomTitle(false); } }}
+                                            className="flex gap-2 animate-in fade-in duration-150"
+                                        >
+                                            <input
+                                                autoFocus
+                                                type="text"
+                                                value={customTitleValue}
+                                                onChange={e => setCustomTitleValue(e.target.value)}
+                                                placeholder="e.g. Mad Men"
+                                                className="flex-1 bg-zinc-800 border border-zinc-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-zinc-600"
+                                            />
+                                            <button type="button" onClick={() => { setShowAddCustomTitle(false); setCustomTitleValue(''); }} className="px-3 py-2.5 bg-zinc-800 text-zinc-400 rounded-xl text-sm transition hover:bg-zinc-700">Cancel</button>
+                                            <button type="submit" disabled={!customTitleValue.trim()} className="px-3 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-medium transition disabled:opacity-40">Add</button>
+                                        </form>
+                                    )}
+                                </div>
                             </div>
                         )}
 
