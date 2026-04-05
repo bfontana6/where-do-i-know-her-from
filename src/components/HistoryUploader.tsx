@@ -17,28 +17,29 @@ function extractTitles(rawTitle: string): string[] {
     return titles;
 }
 
-export default function HistoryUploader({ onHistoryLoaded, onProfileName }: { onHistoryLoaded: (history: string[]) => void; onProfileName?: (name: string) => void }) {
+export default function HistoryUploader({ onProfileCreated }: { onProfileCreated: (name: string, titles: string[]) => Promise<void> }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState(false);
     const [name, setName] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
+        if (!name.trim()) {
+            setError('Please enter your name first.');
+            return;
+        }
+
         setLoading(true);
         setError(null);
-        setSuccess(false);
 
         Papa.parse(file, {
             header: true,
             skipEmptyLines: true,
-            complete: (results) => {
+            complete: async (results) => {
                 try {
-                    // Netflix CSV usually has 'Title' column. Episode entries like
-                    // "Show: Season 4: Episode Name" are expanded to also include "Show".
                     const newTitles = results.data
                         .map((row: any) => row.Title)
                         .filter((title: string) => title && title.trim().length > 0)
@@ -50,23 +51,8 @@ export default function HistoryUploader({ onHistoryLoaded, onProfileName }: { on
                         return;
                     }
 
-                    const storedHistory = localStorage.getItem('watchHistory');
-                    let currentTitles: string[] = [];
-                    if (storedHistory) {
-                        try {
-                            currentTitles = JSON.parse(storedHistory);
-                        } catch (e) {
-                            console.error('Failed to parse existing history for merging', e);
-                        }
-                    }
-
-                    const combinedSet = new Set([...currentTitles, ...newTitles]);
-                    const combinedTitles = Array.from(combinedSet);
-
-                    // Save to local storage for persistence across reloads
-                    localStorage.setItem('watchHistory', JSON.stringify(combinedTitles));
-                    onHistoryLoaded(combinedTitles);
-                    setSuccess(true);
+                    const uniqueTitles = Array.from(new Set(newTitles));
+                    await onProfileCreated(name.trim(), uniqueTitles);
                     setLoading(false);
                 } catch (err) {
                     setError('Failed to parse the CSV file.');
@@ -81,7 +67,11 @@ export default function HistoryUploader({ onHistoryLoaded, onProfileName }: { on
     };
 
     const handleUploadClick = () => {
-        if (name.trim() && onProfileName) onProfileName(name.trim());
+        if (!name.trim()) {
+            setError('Please enter your name first.');
+            return;
+        }
+        setError(null);
         fileInputRef.current?.click();
     };
 
@@ -90,7 +80,7 @@ export default function HistoryUploader({ onHistoryLoaded, onProfileName }: { on
             <h3 className="text-xl font-semibold text-white mb-2">Set Up Your Profile</h3>
             <div className="text-zinc-400 text-sm mb-6 space-y-3">
                 <p>
-                    Your watch history is stored on this device so you never have to re-upload. Export a backup anytime from the menu.
+                    Your profile and watch history are stored in the cloud — they&apos;ll be here whenever you come back.
                 </p>
             </div>
 
@@ -132,7 +122,7 @@ export default function HistoryUploader({ onHistoryLoaded, onProfileName }: { on
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            Parsing CSV...
+                            Setting up your profile...
                         </span>
                     ) : (
                         <span>Select CSV File</span>
@@ -143,13 +133,6 @@ export default function HistoryUploader({ onHistoryLoaded, onProfileName }: { on
             {error && (
                 <div className="mt-4 p-3 bg-red-900/30 border border-red-800 text-red-400 rounded-lg text-sm">
                     {error}
-                </div>
-            )}
-
-            {success && (
-                <div className="mt-4 p-3 bg-green-900/30 border border-green-800 text-green-400 rounded-lg text-sm flex items-center gap-2">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                    History loaded successfully!
                 </div>
             )}
         </div>

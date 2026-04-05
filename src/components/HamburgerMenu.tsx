@@ -41,17 +41,10 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate }: Hamburg
         : displayHistory;
 
     const removeTitle = (titleToRemove: string) => {
-        // Remove both the clean title and any episode entries that start with it
         const updated = (watchHistory || []).filter(t =>
             t !== titleToRemove && !t.toLowerCase().startsWith(titleToRemove.toLowerCase() + ':')
         );
-        if (updated.length === 0) {
-            localStorage.removeItem('watchHistory');
-            onHistoryUpdate(null);
-        } else {
-            localStorage.setItem('watchHistory', JSON.stringify(updated));
-            onHistoryUpdate(updated);
-        }
+        onHistoryUpdate(updated.length === 0 ? null : updated);
     };
 
     const handleAddInSheet = (e: React.FormEvent) => {
@@ -59,7 +52,6 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate }: Hamburg
         if (!newTitleInSheet.trim()) return;
         const currentTitles = watchHistory || [];
         const combinedTitles = Array.from(new Set([...currentTitles, newTitleInSheet.trim()]));
-        localStorage.setItem('watchHistory', JSON.stringify(combinedTitles));
         onHistoryUpdate(combinedTitles);
         setNewTitleInSheet('');
         setShowAddInSheet(false);
@@ -85,8 +77,6 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate }: Hamburg
                         const currentTitles = watchHistory || [];
                         const combinedSet = new Set([...currentTitles, ...newTitles]);
                         const combinedTitles = Array.from(combinedSet);
-
-                        localStorage.setItem('watchHistory', JSON.stringify(combinedTitles));
                         onHistoryUpdate(combinedTitles);
                         setIsOpen(false);
                     } else {
@@ -114,8 +104,6 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate }: Hamburg
         const currentTitles = watchHistory || [];
         const combinedSet = new Set([...currentTitles, singleTitle.trim()]);
         const combinedTitles = Array.from(combinedSet);
-
-        localStorage.setItem('watchHistory', JSON.stringify(combinedTitles));
         onHistoryUpdate(combinedTitles);
         setSingleTitle('');
         setShowSingleTitleInput(false);
@@ -139,7 +127,6 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate }: Hamburg
 
     const handleClearHistory = () => {
         if (window.confirm("Are you sure you want to clear your uploaded watch history?")) {
-            localStorage.removeItem('watchHistory');
             onHistoryUpdate(null);
             setIsOpen(false);
         }

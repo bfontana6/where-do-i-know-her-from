@@ -169,7 +169,6 @@ export default function CameraCapture({ watchHistory, onHistoryUpdate }: { watch
 
     const addTitleToHistory = (title: string) => {
         const updated = Array.from(new Set([...watchHistory, title]));
-        localStorage.setItem('watchHistory', JSON.stringify(updated));
         onHistoryUpdate?.(updated);
         setAddedTitles(prev => new Set([...prev, title]));
     };

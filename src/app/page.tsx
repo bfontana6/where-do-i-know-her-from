@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
 import CameraCapture from '@/components/CameraCapture';
 import HistoryUploader from '@/components/HistoryUploader';
 import HamburgerMenu from '@/components/HamburgerMenu';
@@ -8,28 +9,120 @@ import HamburgerMenu from '@/components/HamburgerMenu';
 export default function Home() {
   const [watchHistory, setWatchHistory] = useState<string[] | null>(null);
   const [profileName, setProfileName] = useState<string | null>(null);
+  const [profileId, setProfileId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [loading, setLoading] = useState(true);
 
+  // Load profile from Supabase on mount
   useEffect(() => {
     setIsClient(true);
-    const storedHistory = localStorage.getItem('watchHistory');
-    if (storedHistory) {
-      try {
-        setWatchHistory(JSON.parse(storedHistory));
-      } catch (e) {
-        console.error('Failed to parse history from local storage');
-      }
+    const storedProfileId = localStorage.getItem('profileId');
+    if (storedProfileId) {
+      loadProfile(storedProfileId);
+    } else {
+      setLoading(false);
     }
-    const storedName = localStorage.getItem('profileName');
-    if (storedName) setProfileName(storedName);
   }, []);
 
-  const handleProfileName = (name: string) => {
-    localStorage.setItem('profileName', name);
-    setProfileName(name);
+  const loadProfile = async (id: string) => {
+    try {
+      const [profileRes, historyRes] = await Promise.all([
+        supabase.from('profiles').select('name').eq('id', id).single(),
+        supabase.from('watch_history').select('title').eq('profile_id', id),
+      ]);
+
+      if (profileRes.error || !profileRes.data) {
+        // Profile not found in cloud — clear stale local pointer
+        localStorage.removeItem('profileId');
+        setLoading(false);
+        return;
+      }
+
+      setProfileId(id);
+      setProfileName(profileRes.data.name);
+      if (historyRes.data && historyRes.data.length > 0) {
+        setWatchHistory(historyRes.data.map(r => r.title));
+      }
+    } catch (e) {
+      console.error('Failed to load profile from Supabase', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (!isClient) return null; // Avoid hydration mismatch
+  const handleProfileCreated = async (name: string, titles: string[]) => {
+    // Create profile in Supabase
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .insert({ name })
+      .select('id')
+      .single();
+
+    if (profileError || !profile) {
+      console.error('Failed to create profile', profileError);
+      return;
+    }
+
+    const newProfileId = profile.id;
+    localStorage.setItem('profileId', newProfileId);
+    setProfileId(newProfileId);
+    setProfileName(name);
+
+    // Bulk insert watch history
+    if (titles.length > 0) {
+      const rows = titles.map(title => ({ profile_id: newProfileId, title }));
+      // Supabase has a row limit per insert, batch in chunks of 500
+      for (let i = 0; i < rows.length; i += 500) {
+        const chunk = rows.slice(i, i + 500);
+        await supabase.from('watch_history').upsert(chunk, { onConflict: 'profile_id,title' });
+      }
+    }
+
+    setWatchHistory(titles);
+  };
+
+  const handleHistoryUpdate = useCallback(async (newHistory: string[] | null) => {
+    setWatchHistory(newHistory);
+
+    if (!profileId) return;
+
+    if (!newHistory || newHistory.length === 0) {
+      // Clear all history in Supabase
+      await supabase.from('watch_history').delete().eq('profile_id', profileId);
+      return;
+    }
+
+    // Sync: delete removed titles, insert new ones
+    const { data: existing } = await supabase
+      .from('watch_history')
+      .select('title')
+      .eq('profile_id', profileId);
+
+    const existingTitles = new Set((existing || []).map(r => r.title));
+    const newTitles = new Set(newHistory);
+
+    // Titles to delete
+    const toDelete = [...existingTitles].filter(t => !newTitles.has(t));
+    if (toDelete.length > 0) {
+      await supabase
+        .from('watch_history')
+        .delete()
+        .eq('profile_id', profileId)
+        .in('title', toDelete);
+    }
+
+    // Titles to insert
+    const toInsert = [...newTitles].filter(t => !existingTitles.has(t));
+    if (toInsert.length > 0) {
+      const rows = toInsert.map(title => ({ profile_id: profileId, title }));
+      for (let i = 0; i < rows.length; i += 500) {
+        const chunk = rows.slice(i, i + 500);
+        await supabase.from('watch_history').upsert(chunk, { onConflict: 'profile_id,title' });
+      }
+    }
+  }, [profileId]);
+
+  if (!isClient || loading) return null;
 
   return (
     <main
@@ -48,7 +141,7 @@ export default function Home() {
           {watchHistory && watchHistory.length > 0 && (
             <HamburgerMenu
               watchHistory={watchHistory}
-              onHistoryUpdate={setWatchHistory}
+              onHistoryUpdate={handleHistoryUpdate}
             />
           )}
         </header>
@@ -57,11 +150,11 @@ export default function Home() {
         <div className="flex-1 flex flex-col pb-6">
           {!watchHistory || watchHistory.length === 0 ? (
             <div className="flex-1 flex flex-col justify-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-              <HistoryUploader onHistoryLoaded={setWatchHistory} onProfileName={handleProfileName} />
+              <HistoryUploader onProfileCreated={handleProfileCreated} />
             </div>
           ) : (
             <div className="flex-1 flex flex-col animate-in fade-in duration-500">
-              <CameraCapture watchHistory={watchHistory} onHistoryUpdate={setWatchHistory} />
+              <CameraCapture watchHistory={watchHistory} onHistoryUpdate={handleHistoryUpdate} />
             </div>
           )}
         </div>
