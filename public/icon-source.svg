@@ -1,109 +1,175 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
-    <!-- Hot cinematic gradient -->
-    <linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1">
-      <stop offset="0%" stop-color="#7c3aed"/>
-      <stop offset="40%" stop-color="#db2777"/>
-      <stop offset="100%" stop-color="#f97316"/>
-    </linearGradient>
-
-    <!-- Glowing white-to-pink for the question mark -->
-    <linearGradient id="qmark" x1="0.5" y1="0" x2="0.5" y2="1">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#fce7f3"/>
-    </linearGradient>
-
-    <!-- Spotlight cone from top -->
-    <radialGradient id="spot" cx="0.5" cy="0.15" r="0.7" fx="0.5" fy="0.1">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.25"/>
-      <stop offset="40%" stop-color="#ffffff" stop-opacity="0.06"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    <!-- Base background: near-black navy -->
+    <!-- Purple radial at top-left — matches app exactly -->
+    <radialGradient id="bg-purple" cx="154" cy="51" r="580" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#4f1682" stop-opacity="0.9"/>
+      <stop offset="55%"  stop-color="#1e1b4b" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#050510" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Emerald radial at bottom-right — matches app exactly -->
+    <radialGradient id="bg-green" cx="870" cy="972" r="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#064e3b" stop-opacity="0.85"/>
+      <stop offset="55%"  stop-color="#065f46" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#050510" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- Soft glow behind the question mark -->
-    <filter id="glow">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="28" result="blur"/>
+    <!-- "?" fill — indigo at top, emerald at bottom: both app accent colors -->
+    <linearGradient id="q-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#e0e7ff"/>
+      <stop offset="35%"  stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#34d399"/>
+    </linearGradient>
+
+    <!-- Eye iris gradient -->
+    <radialGradient id="iris-grad" cx="50%" cy="40%" r="55%">
+      <stop offset="0%"   stop-color="#6366f1"/>
+      <stop offset="60%"  stop-color="#312e81"/>
+      <stop offset="100%" stop-color="#0f0e2a"/>
+    </radialGradient>
+
+    <!-- Eye highlight shimmer -->
+    <radialGradient id="iris-highlight" cx="38%" cy="32%" r="45%">
+      <stop offset="0%"  stop-color="#a5b4fc" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Crisp glow: just enough to make the "?" feel luminous, not blurry -->
+    <filter id="q-glow" x="-12%" y="-12%" width="124%" height="124%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="blur"/>
       <feMerge>
-        <feMergeNode in="blur"/>
         <feMergeNode in="blur"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
 
-    <!-- Outer glow for the silhouette -->
-    <filter id="silhouette-glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="18" result="blur"/>
+    <!-- Iris glow -->
+    <filter id="iris-glow" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="16" result="blur"/>
       <feMerge>
         <feMergeNode in="blur"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
 
-    <!-- Film grain texture overlay -->
-    <filter id="grain">
-      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch" result="noise"/>
-      <feColorMatrix type="saturate" values="0" in="noise" result="mono"/>
-      <feBlend in="SourceGraphic" in2="mono" mode="overlay" result="blend"/>
-      <feComponentTransfer in="blend">
-        <feFuncA type="linear" slope="1"/>
-      </feComponentTransfer>
-    </filter>
+    <!-- Clipping mask for eye shape -->
+    <clipPath id="eye-clip">
+      <path d="M 80 512
+               C 200 295, 400 245, 512 245
+               C 624 245, 824 295, 944 512
+               C 824 729, 624 779, 512 779
+               C 400 779, 200 729, 80 512 Z"/>
+    </clipPath>
   </defs>
 
-  <!-- Background gradient -->
-  <rect width="1024" height="1024" rx="0" fill="url(#bg)"/>
+  <!-- ── Background ─────────────────────────────────────────── -->
+  <rect width="1024" height="1024" fill="#06050f"/>
+  <rect width="1024" height="1024" fill="url(#bg-purple)"/>
+  <rect width="1024" height="1024" fill="url(#bg-green)"/>
 
-  <!-- Spotlight wash -->
-  <rect width="1024" height="1024" fill="url(#spot)"/>
+  <!-- ── Subtle grid scan lines (very faint) ───────────────── -->
+  <!-- Horizontal bars every 64px, just barely visible -->
+  <rect width="1024" height="1" y="128"  fill="white" opacity="0.025"/>
+  <rect width="1024" height="1" y="256"  fill="white" opacity="0.025"/>
+  <rect width="1024" height="1" y="384"  fill="white" opacity="0.025"/>
+  <rect width="1024" height="1" y="512"  fill="white" opacity="0.04"/>
+  <rect width="1024" height="1" y="640"  fill="white" opacity="0.025"/>
+  <rect width="1024" height="1" y="768"  fill="white" opacity="0.025"/>
+  <rect width="1024" height="1" y="896"  fill="white" opacity="0.025"/>
 
-  <!-- Diagonal film-strip accent lines (top-left) -->
-  <line x1="0" y1="220" x2="220" y2="0" stroke="#ffffff" stroke-width="2.5" opacity="0.12"/>
-  <line x1="0" y1="300" x2="300" y2="0" stroke="#ffffff" stroke-width="1.5" opacity="0.08"/>
-  <line x1="0" y1="380" x2="380" y2="0" stroke="#ffffff" stroke-width="1" opacity="0.05"/>
+  <!-- ── Eye white (luminous almond) ───────────────────────── -->
+  <!-- Outer glow of the eye white -->
+  <path d="M 80 512
+           C 200 295, 400 245, 512 245
+           C 624 245, 824 295, 944 512
+           C 824 729, 624 779, 512 779
+           C 400 779, 200 729, 80 512 Z"
+        fill="#e0e7ff" opacity="0.10"
+        filter="url(#iris-glow)"/>
 
-  <!-- Diagonal film-strip accent lines (bottom-right) -->
-  <line x1="804" y1="1024" x2="1024" y2="804" stroke="#ffffff" stroke-width="2.5" opacity="0.12"/>
-  <line x1="724" y1="1024" x2="1024" y2="724" stroke="#ffffff" stroke-width="1.5" opacity="0.08"/>
-  <line x1="644" y1="1024" x2="1024" y2="644" stroke="#ffffff" stroke-width="1" opacity="0.05"/>
+  <!-- Eye white fill (inside the almond) -->
+  <path d="M 80 512
+           C 200 295, 400 245, 512 245
+           C 624 245, 824 295, 944 512
+           C 824 729, 624 779, 512 779
+           C 400 779, 200 729, 80 512 Z"
+        fill="#0e0c24" opacity="0.7"/>
 
-  <!-- Person silhouette — slightly transparent, behind the ? -->
-  <g opacity="0.18" filter="url(#silhouette-glow)">
-    <!-- Head -->
-    <circle cx="512" cy="320" r="145" fill="#ffffff"/>
-    <!-- Shoulders -->
-    <ellipse cx="512" cy="590" rx="220" ry="150" fill="#ffffff"/>
-  </g>
+  <!-- ── Iris ────────────────────────────────────────────────── -->
+  <circle cx="512" cy="512" r="235"
+          fill="url(#iris-grad)"
+          clip-path="url(#eye-clip)"
+          filter="url(#iris-glow)"/>
 
-  <!-- Giant question mark — the hero element -->
-  <text x="524" y="740"
-        font-family="Georgia, 'Times New Roman', serif"
-        font-size="700"
-        font-weight="bold"
-        fill="url(#qmark)"
+  <!-- Iris shimmer/highlight -->
+  <circle cx="512" cy="512" r="235"
+          fill="url(#iris-highlight)"
+          clip-path="url(#eye-clip)"/>
+
+  <!-- Iris ring -->
+  <circle cx="512" cy="512" r="235"
+          fill="none" stroke="#818cf8" stroke-width="6" opacity="0.55"
+          clip-path="url(#eye-clip)"/>
+
+  <!-- ── Pupil ───────────────────────────────────────────────── -->
+  <circle cx="512" cy="512" r="110"
+          fill="#020109"
+          clip-path="url(#eye-clip)"/>
+
+  <!-- ── "?" — the hero element ─────────────────────────────── -->
+  <!-- Subtle dark shadow to anchor it -->
+  <text x="516" y="744"
+        font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-size="680"
+        font-weight="900"
+        fill="#0a0a1e"
         text-anchor="middle"
-        filter="url(#glow)"
-        opacity="0.95">?</text>
+        opacity="0.5">?</text>
 
-  <!-- Small sparkle accents -->
-  <!-- Top-right sparkle -->
-  <g transform="translate(780, 200)" opacity="0.7">
-    <line x1="-18" y1="0" x2="18" y2="0" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
-    <line x1="0" y1="-18" x2="0" y2="18" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
-    <line x1="-10" y1="-10" x2="10" y2="10" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
-    <line x1="10" y1="-10" x2="-10" y2="10" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+  <!-- Main "?" with indigo-to-emerald gradient and crisp glow -->
+  <text x="512" y="740"
+        font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-size="680"
+        font-weight="900"
+        fill="url(#q-grad)"
+        text-anchor="middle"
+        filter="url(#q-glow)">?</text>
+
+  <!-- ── Eye outline (bold stroke over everything) ─────────── -->
+  <path d="M 80 512
+           C 200 295, 400 245, 512 245
+           C 624 245, 824 295, 944 512
+           C 824 729, 624 779, 512 779
+           C 400 779, 200 729, 80 512 Z"
+        fill="none" stroke="#a5b4fc" stroke-width="8" opacity="0.45"/>
+
+  <!-- ── Eyelash accents (upper lashes) ────────────────────── -->
+  <line x1="512" y1="245" x2="512" y2="195" stroke="#c7d2fe" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="400" y1="263" x2="385" y2="215" stroke="#c7d2fe" stroke-width="3" stroke-linecap="round" opacity="0.25"/>
+  <line x1="624" y1="263" x2="639" y2="215" stroke="#c7d2fe" stroke-width="3" stroke-linecap="round" opacity="0.25"/>
+
+  <!-- ── Sparkle — top-right (indigo) ──────────────────────── -->
+  <g transform="translate(826, 186)" opacity="0.8">
+    <line x1="-20" y1="0"  x2="20" y2="0"  stroke="#c7d2fe" stroke-width="4"   stroke-linecap="round"/>
+    <line x1="0"  y1="-20" x2="0"  y2="20" stroke="#c7d2fe" stroke-width="4"   stroke-linecap="round"/>
+    <line x1="-13" y1="-13" x2="13" y2="13" stroke="#c7d2fe" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="13" y1="-13" x2="-13" y2="13" stroke="#c7d2fe" stroke-width="2.5" stroke-linecap="round"/>
   </g>
 
-  <!-- Bottom-left sparkle -->
-  <g transform="translate(220, 820)" opacity="0.5">
-    <line x1="-12" y1="0" x2="12" y2="0" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
-    <line x1="0" y1="-12" x2="0" y2="12" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
-    <line x1="-7" y1="-7" x2="7" y2="7" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="7" y1="-7" x2="-7" y2="7" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- ── Sparkle — bottom-left (emerald) ───────────────────── -->
+  <g transform="translate(195, 838)" opacity="0.7">
+    <line x1="-16" y1="0"  x2="16" y2="0"  stroke="#6ee7b7" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="0"  y1="-16" x2="0"  y2="16" stroke="#6ee7b7" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="-10" y1="-10" x2="10" y2="10" stroke="#6ee7b7" stroke-width="2"   stroke-linecap="round"/>
+    <line x1="10" y1="-10" x2="-10" y2="10" stroke="#6ee7b7" stroke-width="2"   stroke-linecap="round"/>
   </g>
 
-  <!-- Mid-left tiny sparkle -->
-  <g transform="translate(160, 480)" opacity="0.35">
-    <line x1="-8" y1="0" x2="8" y2="0" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
-    <line x1="0" y1="-8" x2="0" y2="8" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+  <!-- ── Small mid-left sparkle ────────────────────────────── -->
+  <g transform="translate(148, 460)" opacity="0.35">
+    <line x1="-9" y1="0" x2="9" y2="0" stroke="#a5b4fc" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="0" y1="-9" x2="0" y2="9" stroke="#a5b4fc" stroke-width="2.5" stroke-linecap="round"/>
   </g>
+
+  <!-- ── Emerald tear-drop accent (bottom of eye — corner of pupil) -->
+  <circle cx="512" cy="779" r="8" fill="#34d399" opacity="0.55"/>
 </svg>
