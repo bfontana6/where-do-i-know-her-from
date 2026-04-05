@@ -40,7 +40,7 @@ interface CastMember {
     profilePath: string | null;
 }
 
-export default function CameraCapture({ watchHistory, onHistoryUpdate }: { watchHistory: string[]; onHistoryUpdate?: (h: string[]) => void }) {
+export default function CameraCapture({ watchHistory, onHistoryUpdate, onDisputeTitle }: { watchHistory: string[]; onHistoryUpdate?: (h: string[]) => void; onDisputeTitle?: (title: string) => void }) {
     const [image, setImage] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [loadingState, setLoadingState] = useState<'idle' | 'recognizing' | 'cross-referencing' | 'cast-lookup'>('idle');
@@ -579,11 +579,47 @@ export default function CameraCapture({ watchHistory, onHistoryUpdate }: { watch
                                                             <p className="text-sm text-zinc-500">as {item.character}</p>
                                                         )}
                                                     </div>
+                                                    <button
+                                                        onClick={() => onDisputeTitle?.(item.title)}
+                                                        className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-zinc-700/50 hover:bg-red-600/30 text-zinc-500 hover:text-red-400 transition"
+                                                        aria-label={`I haven't seen ${item.title}`}
+                                                        title="I haven't seen this"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" /></svg>
+                                                    </button>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                 )}
+                            {/* Add a title not shown */}
+                            <div className="pt-4">
+                                {!showAddCustomTitle ? (
+                                    <button
+                                        onClick={() => setShowAddCustomTitle(true)}
+                                        className="w-full flex items-center gap-2 px-4 py-3 bg-zinc-800/50 hover:bg-zinc-800 border border-dashed border-zinc-700 rounded-xl transition text-sm text-zinc-400 hover:text-white"
+                                    >
+                                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                                        Add another title you&apos;ve seen them in
+                                    </button>
+                                ) : (
+                                    <form
+                                        onSubmit={(e) => { e.preventDefault(); if (customTitleValue.trim()) { addTitleToHistory(customTitleValue.trim()); setCustomTitleValue(''); setShowAddCustomTitle(false); } }}
+                                        className="flex gap-2 animate-in fade-in duration-150"
+                                    >
+                                        <input
+                                            autoFocus
+                                            type="text"
+                                            value={customTitleValue}
+                                            onChange={e => setCustomTitleValue(e.target.value)}
+                                            placeholder="e.g. Mad Men"
+                                            className="flex-1 bg-zinc-800 border border-zinc-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-zinc-600"
+                                        />
+                                        <button type="button" onClick={() => { setShowAddCustomTitle(false); setCustomTitleValue(''); }} className="px-3 py-2.5 bg-zinc-800 text-zinc-400 rounded-xl text-sm transition hover:bg-zinc-700">Cancel</button>
+                                        <button type="submit" disabled={!customTitleValue.trim()} className="px-3 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-medium transition disabled:opacity-40">Add</button>
+                                    </form>
+                                )}
+                            </div>
                             </div>
                         ) : (
                             <div className="space-y-5">

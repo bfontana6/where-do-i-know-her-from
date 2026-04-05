@@ -68,15 +68,14 @@ export async function POST(request: Request) {
                 continue;
             }
 
-            // Fuzzy match: word-boundary regex finds the title within a history item
-            const escapedTitle = normalizedTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // Fuzzy match: only triggers when a history item starts with the TMDB title
+            // followed by a colon (Netflix episode format like "Show: Season 1: Episode").
+            // This avoids false positives from short titles (e.g. "Love" matching "Love Is Blind").
             let isFuzzy = false;
-            try {
-                const titleRegex = new RegExp(`\\b${escapedTitle}\\b`);
-                isFuzzy = normalizedHistory.some((historyItem: string) => titleRegex.test(historyItem));
-            } catch (err) {
+            if (normalizedTitle.length >= 4) {
                 isFuzzy = normalizedHistory.some((historyItem: string) =>
-                    historyItem.includes(normalizedTitle) || normalizedTitle.includes(historyItem)
+                    historyItem.startsWith(normalizedTitle + ':') ||
+                    historyItem.startsWith(normalizedTitle + ' :')
                 );
             }
 

@@ -17,10 +17,11 @@ function extractTitles(rawTitle: string): string[] {
     return titles;
 }
 
-export default function HistoryUploader({ onHistoryLoaded }: { onHistoryLoaded: (history: string[]) => void }) {
+export default function HistoryUploader({ onHistoryLoaded, onProfileName }: { onHistoryLoaded: (history: string[]) => void; onProfileName?: (name: string) => void }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [name, setName] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,15 +80,35 @@ export default function HistoryUploader({ onHistoryLoaded }: { onHistoryLoaded: 
         });
     };
 
+    const handleUploadClick = () => {
+        if (name.trim() && onProfileName) onProfileName(name.trim());
+        fileInputRef.current?.click();
+    };
+
     return (
         <div className="bg-zinc-900/50 backdrop-blur-md rounded-2xl p-6 border border-zinc-800 shadow-xl transition-all">
-            <h3 className="text-xl font-semibold text-white mb-2">Upload Watch History</h3>
+            <h3 className="text-xl font-semibold text-white mb-2">Set Up Your Profile</h3>
             <div className="text-zinc-400 text-sm mb-6 space-y-3">
                 <p>
-                    <strong>How to get your Netflix history:</strong> Go to Netflix Account settings on your browser → Profile & Parental Controls → Viewing activity → <strong>Download all</strong> at the bottom.
+                    Your watch history is stored on this device so you never have to re-upload. Export a backup anytime from the menu.
                 </p>
+            </div>
+
+            {/* Profile name */}
+            <div className="mb-5">
+                <label className="block text-xs text-zinc-500 mb-1.5 px-1">Your name</label>
+                <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="e.g. Brian"
+                    className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-zinc-600"
+                />
+            </div>
+
+            <div className="text-zinc-400 text-sm mb-4 space-y-3">
                 <p>
-                    You can upload multiple files (e.g., from different profiles or other services that use a "Title" column). We will merge them securely on your device.
+                    <strong>How to get your Netflix history:</strong> Go to Netflix Account settings on your browser → Profile & Parental Controls → Viewing activity → <strong>Download all</strong> at the bottom.
                 </p>
             </div>
 
@@ -100,8 +121,9 @@ export default function HistoryUploader({ onHistoryLoaded }: { onHistoryLoaded: 
                     className="hidden"
                     id="csv-upload"
                 />
-                <label
-                    htmlFor="csv-upload"
+                <button
+                    type="button"
+                    onClick={handleUploadClick}
                     className="cursor-pointer flex items-center justify-center w-full py-4 px-4 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-xl transition-colors border border-zinc-700 hover:border-zinc-500 border-dashed"
                 >
                     {loading ? (
@@ -115,7 +137,7 @@ export default function HistoryUploader({ onHistoryLoaded }: { onHistoryLoaded: 
                     ) : (
                         <span>Select CSV File</span>
                     )}
-                </label>
+                </button>
             </div>
 
             {error && (
