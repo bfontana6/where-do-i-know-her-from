@@ -71,15 +71,21 @@ export async function POST(request: Request) {
             // Fuzzy match: only triggers when a history item starts with the TMDB title
             // followed by a colon (Netflix episode format like "Show: Season 1: Episode").
             // This avoids false positives from short titles (e.g. "Love" matching "Love Is Blind").
-            let isFuzzy = false;
+            let matchedHistoryItem: string | null = null;
             if (normalizedTitle.length >= 4) {
-                isFuzzy = normalizedHistory.some((historyItem: string) =>
+                const found = normalizedHistory.find((historyItem: string) =>
                     historyItem.startsWith(normalizedTitle + ':') ||
                     historyItem.startsWith(normalizedTitle + ' :')
                 );
+                if (found) matchedHistoryItem = found;
             }
 
-            if (isFuzzy) {
+            if (matchedHistoryItem) {
+                // Find the original-cased version from the raw watch history
+                const originalItem = (watchHistory || []).find(
+                    (h: string) => h.toLowerCase() === matchedHistoryItem
+                ) || matchedHistoryItem;
+
                 fuzzyMatches.push({
                     id: credit.id,
                     title: title as string,
@@ -87,7 +93,8 @@ export async function POST(request: Request) {
                     mediaType: (credit as any).media_type,
                     posterPath: credit.poster_path ? `https://image.tmdb.org/t/p/w500${credit.poster_path}` : null,
                     releaseYear: releaseDate ? releaseDate.split('-')[0] : 'Unknown',
-                    popularity: credit.popularity || 0
+                    popularity: credit.popularity || 0,
+                    matchedFrom: originalItem as string
                 });
             }
         }

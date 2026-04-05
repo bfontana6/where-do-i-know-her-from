@@ -8,7 +8,6 @@ import HamburgerMenu from '@/components/HamburgerMenu';
 export default function Home() {
   const [watchHistory, setWatchHistory] = useState<string[] | null>(null);
   const [profileName, setProfileName] = useState<string | null>(null);
-  const [pendingHistorySearch, setPendingHistorySearch] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -50,8 +49,6 @@ export default function Home() {
             <HamburgerMenu
               watchHistory={watchHistory}
               onHistoryUpdate={setWatchHistory}
-              pendingHistorySearch={pendingHistorySearch}
-              onClearPendingSearch={() => setPendingHistorySearch(null)}
             />
           )}
         </header>
@@ -64,7 +61,7 @@ export default function Home() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col animate-in fade-in duration-500">
-              <CameraCapture watchHistory={watchHistory} onHistoryUpdate={setWatchHistory} onDisputeTitle={setPendingHistorySearch} />
+              <CameraCapture watchHistory={watchHistory} onHistoryUpdate={setWatchHistory} />
             </div>
           )}
         </div>

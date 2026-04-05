@@ -14,6 +14,7 @@ interface MatchItem {
     posterPath: string | null;
     releaseYear: string;
     popularity?: number;
+    matchedFrom?: string;
 }
 
 interface ActorResult {
@@ -40,7 +41,7 @@ interface CastMember {
     profilePath: string | null;
 }
 
-export default function CameraCapture({ watchHistory, onHistoryUpdate, onDisputeTitle }: { watchHistory: string[]; onHistoryUpdate?: (h: string[]) => void; onDisputeTitle?: (title: string) => void }) {
+export default function CameraCapture({ watchHistory, onHistoryUpdate }: { watchHistory: string[]; onHistoryUpdate?: (h: string[]) => void }) {
     const [image, setImage] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [loadingState, setLoadingState] = useState<'idle' | 'recognizing' | 'cross-referencing' | 'cast-lookup'>('idle');
@@ -54,6 +55,9 @@ export default function CameraCapture({ watchHistory, onHistoryUpdate, onDispute
     const [addedTitles, setAddedTitles] = useState<Set<string>>(new Set());
     const [showAddCustomTitle, setShowAddCustomTitle] = useState(false);
     const [customTitleValue, setCustomTitleValue] = useState('');
+
+    // Dismissed fuzzy matches (client-side only, not removed from history)
+    const [dismissedFuzzy, setDismissedFuzzy] = useState<Set<string>>(new Set());
 
     // "Not found" helper flow
     const [actorNotFound, setActorNotFound] = useState(false);
@@ -81,6 +85,7 @@ export default function CameraCapture({ watchHistory, onHistoryUpdate, onDispute
         setCastResults(null);
         setCastMediaTitle('');
         setAddedTitles(new Set());
+        setDismissedFuzzy(new Set());
         setShowAddCustomTitle(false);
         setCustomTitleValue('');
         if (cameraInputRef.current) cameraInputRef.current.value = '';
@@ -559,33 +564,36 @@ export default function CameraCapture({ watchHistory, onHistoryUpdate, onDispute
                                     </div>
                                 )}
 
-                                {result.fuzzyMatches && result.fuzzyMatches.length > 0 && (
+                                {result.fuzzyMatches && result.fuzzyMatches.filter(m => !dismissedFuzzy.has(m.title)).length > 0 && (
                                     <div>
-                                        <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-1">You may have seen them in:</h3>
-                                        <p className="text-zinc-600 text-xs mb-3">Similar titles found in your history</p>
+                                        <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-1">Possible matches:</h3>
+                                        <p className="text-zinc-600 text-xs mb-3">These aren&apos;t exact matches but may be related to titles in your history</p>
                                         <div className="space-y-2">
-                                            {result.fuzzyMatches.map((item, idx) => (
-                                                <div key={`fuzzy-${item.id}-${idx}`} className="flex gap-3 p-3 bg-zinc-800/20 rounded-xl border border-zinc-800/30 hover:bg-zinc-800/40 transition opacity-80">
-                                                    {item.posterPath ? (
-                                                        /* eslint-disable-next-line @next/next/no-img-element */
-                                                        <img src={item.posterPath} alt={item.title} className="w-12 h-16 object-cover rounded-md shadow opacity-70" />
-                                                    ) : (
-                                                        <div className="w-12 h-16 bg-zinc-800 rounded-md flex items-center justify-center text-xs text-zinc-600 text-center p-1">?</div>
-                                                    )}
-                                                    <div className="flex-1 py-1">
-                                                        <h4 className="font-medium text-zinc-400 text-base leading-tight mb-0.5">{item.title}</h4>
-                                                        <p className="text-zinc-600 text-sm mb-0.5">{item.releaseYear}</p>
-                                                        {item.character && (
-                                                            <p className="text-sm text-zinc-500">as {item.character}</p>
+                                            {result.fuzzyMatches.filter(m => !dismissedFuzzy.has(m.title)).map((item, idx) => (
+                                                <div key={`fuzzy-${item.id}-${idx}`} className="p-3 bg-zinc-800/20 rounded-xl border border-zinc-800/30 transition opacity-80">
+                                                    <div className="flex gap-3">
+                                                        {item.posterPath ? (
+                                                            /* eslint-disable-next-line @next/next/no-img-element */
+                                                            <img src={item.posterPath} alt={item.title} className="w-12 h-16 object-cover rounded-md shadow opacity-70" />
+                                                        ) : (
+                                                            <div className="w-12 h-16 bg-zinc-800 rounded-md flex items-center justify-center text-xs text-zinc-600 text-center p-1">?</div>
                                                         )}
+                                                        <div className="flex-1 py-1">
+                                                            <h4 className="font-medium text-zinc-400 text-base leading-tight mb-0.5">{item.title}</h4>
+                                                            <p className="text-zinc-600 text-sm mb-0.5">{item.releaseYear}</p>
+                                                            {item.character && (
+                                                                <p className="text-sm text-zinc-500">as {item.character}</p>
+                                                            )}
+                                                        </div>
                                                     </div>
+                                                    {item.matchedFrom && (
+                                                        <p className="text-amber-400/70 text-xs mt-2 px-1">Suggested because you watched &ldquo;{item.matchedFrom}&rdquo;</p>
+                                                    )}
                                                     <button
-                                                        onClick={() => onDisputeTitle?.(item.title)}
-                                                        className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-zinc-700/50 hover:bg-red-600/30 text-zinc-500 hover:text-red-400 transition"
-                                                        aria-label={`I haven't seen ${item.title}`}
-                                                        title="I haven't seen this"
+                                                        onClick={() => setDismissedFuzzy(prev => new Set([...prev, item.title]))}
+                                                        className="mt-2 text-xs text-zinc-500 hover:text-zinc-300 transition underline underline-offset-2"
                                                     >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" /></svg>
+                                                        Not the same — I haven&apos;t seen this
                                                     </button>
                                                 </div>
                                             ))}

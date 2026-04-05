@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import Papa from 'papaparse';
 
 /**
@@ -17,11 +17,9 @@ function extractTitles(rawTitle: string): string[] {
 interface HamburgerMenuProps {
     watchHistory: string[] | null;
     onHistoryUpdate: (newHistory: string[] | null) => void;
-    pendingHistorySearch?: string | null;
-    onClearPendingSearch?: () => void;
 }
 
-export default function HamburgerMenu({ watchHistory, onHistoryUpdate, pendingHistorySearch, onClearPendingSearch }: HamburgerMenuProps) {
+export default function HamburgerMenu({ watchHistory, onHistoryUpdate }: HamburgerMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [showSingleTitleInput, setShowSingleTitleInput] = useState(false);
     const [showHistoryView, setShowHistoryView] = useState(false);
@@ -31,15 +29,6 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate, pendingHi
     const [showAddInSheet, setShowAddInSheet] = useState(false);
     const [newTitleInSheet, setNewTitleInSheet] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Auto-open history sheet when a disputed title comes in from CameraCapture
-    useEffect(() => {
-        if (pendingHistorySearch) {
-            setShowHistoryView(true);
-            setHistorySearch(pendingHistorySearch);
-            setIsOpen(false);
-        }
-    }, [pendingHistorySearch]);
 
     // For the viewer, show only "clean" titles — not raw Netflix episode strings
     // (those are still stored for matching purposes but would clutter the list)
@@ -274,7 +263,7 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate, pendingHi
             {showHistoryView && (
                 <div
                     className="fixed inset-0 z-[200] bg-black/70 flex flex-col justify-end"
-                    onClick={() => { setShowHistoryView(false); setHistorySearch(''); setShowAddInSheet(false); setNewTitleInSheet(''); onClearPendingSearch?.(); }}
+                    onClick={() => { setShowHistoryView(false); setHistorySearch(''); setShowAddInSheet(false); setNewTitleInSheet(''); }}
                 >
                     <div
                         className="bg-zinc-950 border-t border-zinc-800 rounded-t-3xl flex flex-col animate-in slide-in-from-bottom-4 duration-300"
@@ -301,7 +290,7 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate, pendingHi
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
                                 </button>
                                 <button
-                                    onClick={() => { setShowHistoryView(false); setHistorySearch(''); setShowAddInSheet(false); setNewTitleInSheet(''); onClearPendingSearch?.(); }}
+                                    onClick={() => { setShowHistoryView(false); setHistorySearch(''); setShowAddInSheet(false); setNewTitleInSheet(''); }}
                                     className="p-2 text-zinc-500 hover:text-white transition rounded-lg hover:bg-zinc-800"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -354,11 +343,9 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate, pendingHi
                                 </p>
                             ) : (
                                 <ul>
-                                    {filteredHistory.map((title, idx) => {
-                                        const isHighlighted = pendingHistorySearch && title.toLowerCase().includes(pendingHistorySearch.toLowerCase());
-                                        return (
-                                        <li key={idx} className={`flex items-center justify-between px-3 py-2.5 rounded-xl group transition ${isHighlighted ? 'bg-amber-500/15 ring-1 ring-amber-500/30' : 'hover:bg-zinc-900'}`}>
-                                            <span className={`text-sm truncate flex-1 pr-3 ${isHighlighted ? 'text-amber-200 font-medium' : 'text-zinc-300'}`}>{title}</span>
+                                    {filteredHistory.map((title, idx) => (
+                                        <li key={idx} className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-zinc-900 group">
+                                            <span className="text-zinc-300 text-sm truncate flex-1 pr-3">{title}</span>
                                             <button
                                                 onClick={() => removeTitle(title)}
                                                 className="flex-shrink-0 p-1.5 text-zinc-700 hover:text-red-400 hover:bg-zinc-800 rounded-lg transition"
@@ -367,8 +354,7 @@ export default function HamburgerMenu({ watchHistory, onHistoryUpdate, pendingHi
                                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                             </button>
                                         </li>
-                                        );
-                                    })}
+                                    ))}
                                 </ul>
                             )}
                         </div>
