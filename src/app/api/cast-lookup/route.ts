@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { TMDB } from 'tmdb-ts';
 
+// TODO(tech-debt): client is instantiated at module load, so `next build` needs
+// TMDB_ACCESS_TOKEN set even when not hitting this route. Move to lazy init.
 const tmdb = new TMDB(process.env.TMDB_ACCESS_TOKEN || '');
 
 export async function POST(request: Request) {

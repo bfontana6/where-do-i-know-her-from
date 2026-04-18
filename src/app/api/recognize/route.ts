@@ -3,6 +3,8 @@ import { GoogleGenAI } from '@google/genai';
 
 // Initialize the Google Gen AI client
 // Provide the API key through the GEMINI_API_KEY environment variable
+// TODO(tech-debt): client is instantiated at module load, so `next build` fails if
+// GEMINI_API_KEY is unset even when the route isn't being hit. Move to lazy init.
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function POST(request: Request) {
