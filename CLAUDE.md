@@ -1,91 +1,22 @@
 # what-do-i-know-them-from — Project Context
 
-## Product Context
+**What it does:** Mobile-first PWA — user photographs their TV screen, app identifies the actor via Gemini Vision, then shows which titles from their Netflix watch history that actor appeared in. Watch history is imported once as a Netflix `ViewingActivity.csv`. No accounts; one profile per device (UUID in localStorage). Stack: Next.js 16 App Router, TypeScript, Tailwind v4, Supabase, `gemini-2.5-pro`, TMDB. Env vars in `.env.local.example`.
 
-- **Problem:** A viewer watching TV sees a familiar face and wants to know where they recognize that actor from, without leaving the couch. Answers "where do I know them from?" by cross-referencing actor filmography against the user's own Netflix watch history.
-- **Core flow:** Photograph TV screen → Gemini Vision identifies actor → TMDB filmography fetch → match against imported Netflix `ViewingActivity.csv` → display matches. Secondary "cast lookup" path: user types a show name and browses its cast when Gemini fails.
-- **Watch history source:** Netflix `ViewingActivity.csv` only. Fuzzy-matched against TMDB to handle "Show: Season X: Episode Y" format. Stored in Supabase, cached in localStorage.
-- **Auth and profile:** No authentication by design — friction-free is a product requirement, not a gap. One profile per device, UUID in localStorage. No multi-user, account, or social layer.
-- **Platform target:** Mobile-first PWA for iOS standalone mode. UX assumes one-handed use from a couch with safe area insets and full-screen layout.
-- **Out of scope:** Multi-user profiles, social features, streaming integrations beyond Netflix CSV, any login/account flow.
+## Critical Constraints
 
-## Tech Stack
-
-| Layer | Detail |
-|---|---|
-| Framework | Next.js 16.1.6 (App Router, TypeScript) |
-| React | 19.2.3 |
-| Styling | Tailwind CSS v4 via `@tailwindcss/postcss` — **no `tailwind.config.js`** (v4 config-free) |
-| Supabase | @supabase/supabase-js 2.101.1 |
-| AI | @google/genai 1.43.0 — model: `gemini-2.5-pro` |
-| TMDB | tmdb-ts 2.3.0 |
-| CSV parsing | papaparse 5.5.3 |
-
-## Environment Variables
-
-| Name | Side | Purpose |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Client + Server | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client + Server | Supabase anon key |
-| `GEMINI_API_KEY` | Server only | Google Gemini API key |
-| `TMDB_ACCESS_TOKEN` | Server only | TMDB **v4 bearer token** (not v3 API key) |
-
-All four documented in `.env.local.example`.
-
-## Supabase Setup
-
-- **Schema: `app_moviefaces`** (not `public`). Set in `createClient` as `db: { schema: 'app_moviefaces' }`. A client without this config queries the wrong schema and returns empty results with no error.
-- **Tables:** `profiles` (id, name), `watch_history` (profile_id, title)
-- **Auth:** anon key only. No service role key anywhere in the codebase.
-- **RLS** silently returns `[]` instead of an error when blocking a query — watch history reads that return empty may be RLS blocking, not empty data. The app caches history in localStorage as a fallback for exactly this reason.
-- **localStorage keys:** `profileId`, `profileName`, `watchHistory_{profileId}`
-- **No Supabase Auth.** RLS enforces access by UUID match from localStorage. Introducing auth requires migrating all RLS policies and would orphan existing anonymous profiles.
-
-## Key API Routes
-
-| Route | What it does |
-|---|---|
-| `POST /api/recognize` | Accepts multipart image, converts to base64, calls `gemini-2.5-pro` (temp: 0, thinkingBudget: 5000). Returns `{ actor: { name } }` or 404 if UNKNOWN. |
-| `POST /api/cross-reference` | Takes `{ actorName, profileId }`. TMDB person search → combinedCredits → fuzzy match against Supabase watch_history. Returns matches, fuzzyMatches, topFilmography (top 12 by vote_average). |
-| `POST /api/cast-lookup` | Takes `{ showName }`. Parallel TV+movie TMDB search → picks higher popularity result → returns top 20 cast with profile photos. Used when Gemini fails to identify anyone. |
-
-## Key Components
-
-| Component | Role |
-|---|---|
-| `CameraCapture` | Main interaction. Two file inputs (camera + library). Resizes images client-side (canvas, max 1024px, JPEG 0.85) before upload. 15s AbortController on full pipeline. Renders all result sections. |
-| `HistoryUploader` | Onboarding. Collects name, parses Netflix CSV via PapaParse, calls `onProfileCreated`. |
-| `HamburgerMenu` | Top-right nav. Watch history management. |
-| `src/lib/titles.ts` | `extractTitles()` — double-emits "Show: Season X" entries as both base title and full title for TMDB matching. |
-
-## PWA Setup
-
-| Setting | Value |
-|---|---|
-| Display | `standalone` (full screen, no browser chrome) |
-| `theme_color` | `#1e1b4b` |
-| Viewport | `viewportFit: cover` — content extends under notch/home indicator |
-| Safe areas | `env(safe-area-inset-top)` applied to `body` in `globals.css` |
-| Apple status bar | `black-translucent` |
-| Icons | 192×192, 512×512, 512×512 maskable, 180×180 apple-touch-icon |
-
-## Architecture Notes
-
-- **Two-step pipeline is intentional — do not collapse it.** `/api/recognize` (Gemini) and `/api/cross-reference` (TMDB + match) are separate so each can fail independently and so `/api/cast-lookup` can bypass Gemini entirely. Merging them breaks the fallback path.
-- **`gemini-2.5-pro` + `thinkingBudget: 5000` is load-bearing.** TV screen photos are low-quality, skewed, and partial-frame. Flash/Lite models degrade recognition materially in this domain. Do not downgrade without measuring accuracy on real samples.
-- **The localStorage cache is a performance invariant.** App renders from cache immediately; Supabase hydrates in background. Removing the cache makes the app feel broken on load. The stale window is intentional.
-- **15-second AbortController covers the full pipeline, not per-step.** Any addition (extra API call, retry loop, server-side resize) must fit within this budget or it will silently time out.
-- **Client-side image resize must stay client-side.** Moving it server-side adds a round-trip before Gemini. Removing it inflates token costs and risks payload rejections.
-
-## Developer Notes
-
-- **Tailwind v4 — no config file.** Do not create `tailwind.config.js` or `tailwind.config.ts`. All theme customization goes in `globals.css` via `@theme inline`. Adding a config file breaks the build.
-- **TMDB token is v4 bearer (`TMDB_ACCESS_TOKEN`).** Do not rename to `TMDB_API_KEY` or switch to v3 query-param pattern — `tmdb-ts` uses it as a bearer token automatically.
-- **Do not use Next.js `<Image>` for TMDB photos.** TMDB CDN domain (`image.tmdb.org`) is not in `next.config.ts`. Use raw `<img>` tags. If you add the domain intentionally, be consistent.
-- **All new API routes need a 15-second AbortController** covering the full pipeline. Reference `/api/recognize` as the pattern.
-- **Handle 429s explicitly.** Gemini: check `error.error.status === 'RESOURCE_EXHAUSTED'`. Surface a user-facing "wait 30 seconds" message; do not retry in the same request cycle.
-- **`extractTitles()` intentionally double-emits.** "Seinfeld: Season 4" produces both `"Seinfeld"` and the full string. Do not deduplicate at parse time — dedup only at match time if needed.
-- **No test suite exists.** If Maia is invoked: Vitest + jsdom + `@testing-library/react`. Mock `@google/genai` and `tmdb-ts`. Highest-value unit test targets: canvas resize utility and `extractTitles()`.
+- **Supabase schema is `app_moviefaces`, not `public`.** Missing this in `createClient` silently queries the wrong schema — no error, just empty results.
+- **RLS silently returns `[]` instead of an error** when blocking a query. Empty watch history reads may be RLS, not truly empty data. The `watchHistory_{profileId}` localStorage cache exists for exactly this reason.
+- **`TMDB_ACCESS_TOKEN` is a v4 bearer token, not a v3 API key.** `tmdb-ts` passes it as a Bearer header automatically. Do not rename it or switch to query-param style.
+- **Tailwind v4 has no `tailwind.config.js`.** Config-free — all customization in `globals.css` via `@theme inline`. Adding a config file breaks the build.
+- **`gemini-2.5-pro` + `thinkingBudget: 5000` is load-bearing.** TV screen photos are low-quality, skewed, and partial-frame. Flash/Lite models degrade recognition materially. Don't downgrade without measuring on real samples.
+- **Two-step pipeline (`/api/recognize` → `/api/cross-reference`) is intentional.** Separate so each can fail independently and so `/api/cast-lookup` can bypass Gemini entirely. Collapsing them breaks the fallback path.
+- **The localStorage cache is a performance invariant.** App renders from cache immediately; Supabase hydrates in background. The stale window is intentional — removing the cache makes load feel broken.
+- **AbortController (15s) covers the full pipeline, not per-step.** Any added API call or retry must fit within this budget or it silently times out.
+- **Client-side image resize (canvas, max 1024px, JPEG 0.85) must stay client-side.** Moving it server-side adds a pre-Gemini round-trip; removing it inflates token costs.
+- **Do not use Next.js `<Image>` for TMDB photos.** `image.tmdb.org` is not in `next.config.ts`. Use raw `<img>` tags.
+- **`extractTitles()` in `src/lib/titles.ts` intentionally double-emits.** "Show: Season X" produces both the base title and the full string. Do not deduplicate at parse time.
+- **Gemini 429s have a non-standard error shape** — check `error.error.status === 'RESOURCE_EXHAUSTED'`, not the HTTP status. Surface "wait 30 seconds" to the user; do not retry in the same request.
+- **No test suite exists.** If Maia is invoked: Vitest + jsdom, mock `@google/genai` and `tmdb-ts`. Best first targets: `extractTitles()` and the canvas resize utility.
 
 ---
 
