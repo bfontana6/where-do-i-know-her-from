@@ -1,10 +1,6 @@
 'use client';
 
-// TODO: Explore allowing the user to tap/select a specific person when multiple
-// people appear in the submitted scene image.
-// TODO: Support identifying all people in a scene simultaneously (batch results).
-
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface MatchItem {
     id: number;
@@ -44,23 +40,75 @@ interface CastMember {
     profilePath: string | null;
 }
 
-// CHANGE 2: Resize image before Gemini upload — avoids sending unnecessarily large files
-async function resizeImage(file: File, maxPx = 1024): Promise<File> {
-    return new Promise((resolve) => {
+interface ActorCandidate {
+    id: number;
+    name: string;
+    profilePath: string | null;
+}
+
+interface RecognitionResponse {
+    recognition: {
+        status: 'identified' | 'ambiguous' | 'unknown';
+        candidates: Array<{ name: string }>;
+        sceneTitle: string | null;
+    };
+}
+
+interface CandidateResponse {
+    candidates: ActorCandidate[];
+}
+
+class ApiRequestError extends Error {
+    constructor(message: string, readonly status: number) {
+        super(message);
+        this.name = 'ApiRequestError';
+    }
+}
+
+function isCandidateResponse(data: ActorResult | CandidateResponse): data is CandidateResponse {
+    return 'candidates' in data;
+}
+
+async function resizeImage(file: File, maxPx = 1600): Promise<File> {
+    return new Promise((resolve, reject) => {
         const img = new Image();
         const url = URL.createObjectURL(file);
+        const cleanup = () => URL.revokeObjectURL(url);
+
         img.onload = () => {
-            URL.revokeObjectURL(url);
+            cleanup();
             const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
-            if (scale >= 1) { resolve(file); return; }
             const canvas = document.createElement('canvas');
             canvas.width = Math.round(img.width * scale);
             canvas.height = Math.round(img.height * scale);
-            canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const context = canvas.getContext('2d');
+
+            if (!context || canvas.width === 0 || canvas.height === 0) {
+                reject(new Error('This image could not be prepared. Please choose another one.'));
+                return;
+            }
+
+            context.drawImage(img, 0, 0, canvas.width, canvas.height);
             canvas.toBlob(
-                (blob) => resolve(new File([blob!], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })),
-                'image/jpeg', 0.85
+                (blob) => {
+                    if (!blob) {
+                        reject(new Error('This image could not be prepared. Please choose another one.'));
+                        return;
+                    }
+
+                    resolve(new File(
+                        [blob],
+                        file.name.replace(/\.[^.]+$/, '.jpg'),
+                        { type: 'image/jpeg' },
+                    ));
+                },
+                'image/jpeg',
+                0.9,
             );
+        };
+        img.onerror = () => {
+            cleanup();
+            reject(new Error('This image format could not be read. Try a screenshot or JPEG.'));
         };
         img.src = url;
     });
@@ -86,7 +134,6 @@ export default function CameraCapture({
     const [correctionName, setCorrectionName] = useState('');
 
     // Add-to-history from results
-    const [addedTitles, setAddedTitles] = useState<Set<string>>(new Set());
     const [showAddCustomTitle, setShowAddCustomTitle] = useState(false);
     const [customTitleValue, setCustomTitleValue] = useState('');
 
@@ -100,11 +147,69 @@ export default function CameraCapture({
     const [helperShowName, setHelperShowName] = useState('');
     const [castResults, setCastResults] = useState<CastMember[] | null>(null);
     const [castMediaTitle, setCastMediaTitle] = useState('');
+    const [actorCandidates, setActorCandidates] = useState<ActorCandidate[] | null>(null);
 
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const libraryInputRef = useRef<HTMLInputElement>(null);
     // CHANGE 3: AbortController ref for cancellation and timeout
     const abortRef = useRef<AbortController | null>(null);
+
+    useEffect(() => () => {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+    }, [previewUrl]);
+
+    const requestJson = async <T,>(
+        url: string,
+        init: RequestInit,
+        timeoutMs = 56000,
+    ): Promise<T> => {
+        const controller = new AbortController();
+        abortRef.current = controller;
+        const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+            const response = await fetch(url, { ...init, signal: controller.signal });
+            const data = await response.json().catch(() => ({})) as T & { error?: string };
+
+            if (!response.ok) {
+                throw new ApiRequestError(
+                    data.error || 'The request failed. Please try again.',
+                    response.status,
+                );
+            }
+
+            return data;
+        } finally {
+            window.clearTimeout(timeoutId);
+            if (abortRef.current === controller) abortRef.current = null;
+        }
+    };
+
+    const applyActorResult = (data: ActorResult) => {
+        setActorCandidates(null);
+        setResult({
+            actorName: data.actorName,
+            actorId: data.actorId,
+            actorProfilePath: data.actorProfilePath || null,
+            imdbUrl: data.imdbUrl || null,
+            matches: data.matches || [],
+            fuzzyMatches: data.fuzzyMatches || [],
+            topFilmography: data.topFilmography || [],
+        });
+    };
+
+    const applyActorLookup = (data: ActorResult | CandidateResponse) => {
+        if (isCandidateResponse(data)) {
+            if (data.candidates.length === 0) {
+                setActorNotFound(true);
+            } else {
+                setActorCandidates(data.candidates);
+            }
+            return;
+        }
+
+        applyActorResult(data);
+    };
 
     const resetAll = () => {
         // CHANGE 3: Cancel any in-flight request on reset
@@ -122,7 +227,7 @@ export default function CameraCapture({
         setHelperShowName('');
         setCastResults(null);
         setCastMediaTitle('');
-        setAddedTitles(new Set());
+        setActorCandidates(null);
         setDismissedFuzzy(new Set());
         setShowAddCustomTitle(false);
         setCustomTitleValue('');
@@ -134,88 +239,92 @@ export default function CameraCapture({
         const file = event.target.files?.[0];
         if (!file) return;
 
-        // CHANGE 2: Resize before processing to keep uploads fast
-        const resized = await resizeImage(file);
-        setImage(resized);
-        setPreviewUrl(URL.createObjectURL(resized));
-        setResult(null);
-        setError(null);
-        // CHANGE 7: Removed setFeedback(null)
-        setShowCorrectionInput(false);
-        setCorrectionName('');
+        try {
+            const resized = await resizeImage(file);
+            setImage(resized);
+            setPreviewUrl(URL.createObjectURL(resized));
+            setResult(null);
+            setActorCandidates(null);
+            setActorNotFound(false);
+            setError(null);
+            setShowCorrectionInput(false);
+            setCorrectionName('');
 
-        await processImage(resized);
+            await processImage(resized);
+        } catch (captureError: unknown) {
+            setError(captureError instanceof Error
+                ? captureError.message
+                : 'This image could not be prepared. Please choose another one.');
+        }
     };
 
-    // CHANGE 3: AbortController + 15-second timeout; CHANGE 1: sends profileId instead of watchHistory
-    const processImage = async (file: File) => {
-        abortRef.current = new AbortController();
-        const { signal } = abortRef.current;
-        const timeoutId = setTimeout(() => abortRef.current?.abort(), 15000);
+    const crossReferenceActor = async (actorName: string, actorId?: number) => requestJson<ActorResult | CandidateResponse>(
+        '/api/cross-reference',
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ actorName, actorId, profileId, watchHistory }),
+        },
+    );
 
+    const processImage = async (file: File) => {
         try {
+            setError(null);
+            setResult(null);
+            setActorCandidates(null);
+            setActorNotFound(false);
             setLoadingState('recognizing');
 
-            // Step 1: Recognize Actor
             const formData = new FormData();
             formData.append('image', file);
-
-            const recognitionRes = await fetch('/api/recognize', {
+            const recognitionData = await requestJson<RecognitionResponse>('/api/recognize', {
                 method: 'POST',
                 body: formData,
-                signal,
             });
+            const recognition = recognitionData.recognition;
 
-            const recognitionData = await recognitionRes.json();
-
-            if (recognitionRes.status === 404) {
-                // Could not identify — show the helper flow instead of a generic error
+            if (!recognition || recognition.status === 'unknown' || recognition.candidates.length === 0) {
                 setActorNotFound(true);
-                setLoadingState('idle');
                 return;
             }
 
-            if (!recognitionRes.ok) {
-                throw new Error(recognitionData.error || 'Failed to recognize actor');
-            }
-
-            const actorName = recognitionData.actor.name;
-
-            // Step 2: Cross Reference — CHANGE 1: profileId replaces watchHistory
             setLoadingState('cross-referencing');
+            if (recognition.status === 'ambiguous' || recognition.candidates.length > 1) {
+                const candidateData = await requestJson<CandidateResponse>('/api/cross-reference', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        resolveOnly: true,
+                        actorCandidates: recognition.candidates.map((candidate) => candidate.name),
+                    }),
+                });
 
-            const crossRefRes = await fetch('/api/cross-reference', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ actorName, profileId }),
-                signal,
-            });
+                if (candidateData.candidates.length === 0) {
+                    setActorNotFound(true);
+                    return;
+                }
 
-            const crossRefData = await crossRefRes.json();
+                if (candidateData.candidates.length > 1) {
+                    setActorCandidates(candidateData.candidates);
+                    return;
+                }
 
-            if (!crossRefRes.ok) {
-                throw new Error(crossRefData.error || 'Failed to cross reference');
+                const [candidate] = candidateData.candidates;
+                applyActorLookup(await crossReferenceActor(candidate.name, candidate.id));
+                return;
             }
 
-            setResult({
-                actorName: crossRefData.actorName,
-                actorId: crossRefData.actorId,
-                actorProfilePath: crossRefData.actorProfilePath || null,
-                imdbUrl: crossRefData.imdbUrl || null,
-                matches: crossRefData.matches || [],
-                fuzzyMatches: crossRefData.fuzzyMatches || [],
-                topFilmography: crossRefData.topFilmography || [],
-            });
-
-        } catch (err: any) {
-            // CHANGE 3: Distinguish abort/timeout from other errors
-            if (err.name === 'AbortError') {
+            const [candidate] = recognition.candidates;
+            applyActorLookup(await crossReferenceActor(candidate.name));
+        } catch (err: unknown) {
+            if (err instanceof ApiRequestError && err.status === 404) {
+                setActorNotFound(true);
+            } else if (err instanceof Error && err.name === 'AbortError') {
                 setError('Request timed out or was cancelled. Check your connection and try again.');
             } else {
-                setError(err.message || 'An unexpected error occurred');
+                setError(err instanceof Error ? err.message : 'An unexpected error occurred');
             }
         } finally {
-            clearTimeout(timeoutId);
             setLoadingState('idle');
         }
     };
@@ -223,7 +332,6 @@ export default function CameraCapture({
     const addTitleToHistory = (title: string) => {
         const updated = Array.from(new Set([...watchHistory, title]));
         onHistoryUpdate?.(updated);
-        setAddedTitles(prev => new Set([...prev, title]));
     };
 
     const lookupShowCast = async (showName: string) => {
@@ -231,17 +339,15 @@ export default function CameraCapture({
         setCastMediaTitle('');
         try {
             setLoadingState('cast-lookup');
-            const res = await fetch('/api/cast-lookup', {
+            const data = await requestJson<{ mediaTitle?: string; cast?: CastMember[] }>('/api/cast-lookup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ showName }),
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to look up cast');
             setCastMediaTitle(data.mediaTitle || showName);
             setCastResults(data.cast || []);
-        } catch (err: any) {
-            setError(err.message || 'Failed to look up cast');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Failed to look up cast');
             setActorNotFound(false);
         } finally {
             setLoadingState('idle');
@@ -249,10 +355,11 @@ export default function CameraCapture({
     };
 
     // CHANGE 1: sends profileId instead of watchHistory; CHANGE 7: removed setFeedback(null)
-    const lookupActor = async (actorName: string) => {
+    const lookupActor = async (actorName: string, actorId?: number) => {
         setShowCorrectionInput(false);
         setCorrectionName('');
         setActorNotFound(false);
+        setActorCandidates(null);
         setHelperMode(null);
         setHelperActorName('');
         setHelperShowName('');
@@ -262,24 +369,15 @@ export default function CameraCapture({
         setError(null);
         try {
             setLoadingState('cross-referencing');
-            const crossRefRes = await fetch('/api/cross-reference', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ actorName, profileId }),
-            });
-            const crossRefData = await crossRefRes.json();
-            if (!crossRefRes.ok) throw new Error(crossRefData.error || 'Failed to cross reference');
-            setResult({
-                actorName: crossRefData.actorName,
-                actorId: crossRefData.actorId,
-                actorProfilePath: crossRefData.actorProfilePath || null,
-                imdbUrl: crossRefData.imdbUrl || null,
-                matches: crossRefData.matches || [],
-                fuzzyMatches: crossRefData.fuzzyMatches || [],
-                topFilmography: crossRefData.topFilmography || [],
-            });
-        } catch (err: any) {
-            setError(err.message || 'An unexpected error occurred');
+            applyActorLookup(await crossReferenceActor(actorName, actorId));
+        } catch (err: unknown) {
+            if (err instanceof ApiRequestError && err.status === 404) {
+                setActorNotFound(true);
+            } else if (err instanceof Error && err.name === 'AbortError') {
+                setError('Request timed out or was cancelled. Check your connection and try again.');
+            } else {
+                setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+            }
         } finally {
             setLoadingState('idle');
         }
@@ -383,6 +481,7 @@ export default function CameraCapture({
                             {loadingState === 'recognizing' ? 'Identifying actor…'
                                 : loadingState === 'cross-referencing' ? 'Checking your history…'
                                 : result ? 'Match found'
+                                : actorCandidates ? 'Choose the closest match'
                                 : 'Ready'}
                         </p>
                     </div>
@@ -432,6 +531,37 @@ export default function CameraCapture({
                             New Scan
                         </button>
                     </div>
+                </div>
+            )}
+
+            {actorCandidates && loadingState === 'idle' && (
+                <div className="w-full bg-[#141414] border border-[#262626] rounded-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="p-5 border-b border-[#262626]">
+                        <p className="text-white font-semibold text-base">Which actor is this?</p>
+                        <p className="text-zinc-500 text-sm mt-0.5">The image produced more than one credible match. Pick the closest face.</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 p-4">
+                        {actorCandidates.map((candidate) => (
+                            <button
+                                key={candidate.id}
+                                onClick={() => lookupActor(candidate.name, candidate.id)}
+                                className="flex flex-col items-center gap-2 p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition active:scale-95 text-center"
+                            >
+                                {candidate.profilePath ? (
+                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                    <img src={candidate.profilePath} alt={candidate.name} className="w-20 h-20 rounded-full object-cover border border-zinc-700" />
+                                ) : (
+                                    <div className="w-20 h-20 rounded-full bg-zinc-700 border border-zinc-600 flex items-center justify-center">
+                                        <svg className="w-8 h-8 text-zinc-500" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+                                    </div>
+                                )}
+                                <p className="text-white text-xs font-medium leading-tight">{candidate.name}</p>
+                            </button>
+                        ))}
+                    </div>
+                    <button onClick={() => { setActorCandidates(null); setActorNotFound(true); }} className="w-full py-3 border-t border-[#262626] text-xs text-[#808080] hover:text-zinc-300 transition">
+                        None of these
+                    </button>
                 </div>
             )}
 
@@ -530,7 +660,7 @@ export default function CameraCapture({
                                 {castResults.map((member) => (
                                     <button
                                         key={member.id}
-                                        onClick={() => lookupActor(member.name)}
+                                        onClick={() => lookupActor(member.name, member.id)}
                                         className="flex flex-col items-center gap-1.5 p-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition active:scale-95 text-center"
                                     >
                                         {member.profilePath ? (
@@ -554,7 +684,7 @@ export default function CameraCapture({
             {result && (
                 <div className="w-full bg-[#141414] rounded-2xl overflow-hidden border border-[#262626] shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="py-6 pr-6 pl-5 border-l-4 border-l-[#4f46e5] border-b border-[#262626]">
-                        <p className="text-[11px] font-semibold tracking-[0.12em] uppercase text-[#818cf8] mb-3">Actor Identified!</p>
+                        <p className="text-[11px] font-semibold tracking-[0.12em] uppercase text-[#818cf8] mb-3">Best match</p>
                         <div className="flex items-center gap-4">
                             {result.actorProfilePath && (
                                 /* eslint-disable-next-line @next/next/no-img-element */
